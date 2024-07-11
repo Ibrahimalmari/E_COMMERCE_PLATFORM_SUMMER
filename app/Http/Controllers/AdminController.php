@@ -70,7 +70,7 @@ class AdminController extends Controller
    
     public function showNotifications()
     {
-        $notifications = DatabaseNotification::all();    
+        $notifications = DatabaseNotification::where('notifiable_type', 'App\Models\Admin')->get();
 
         return response()->json([
             'status' => 200,
@@ -353,97 +353,5 @@ public function adminchangePassword(Request $request, $id)
     ]);
 }
   
-
-
-public function acceptNotification(Request $request)
-    {
-        $notification = Notification::find($request->notification_id);
-        
-        if ($notification) {
-            // تحقق من نوع الإشعار واتبع المنطق المناسب
-            $data = $notification->data;
-            $isAccepted = false;
-            $message = '';
-
-            switch ($notification->type) {
-                case 'category':
-                    // تحقق من معايير الفئة ورفعها
-                    if ($this->validateCategory($data)) {
-                        $category = Category::create([
-                            'name' => $data['category_name'],
-                            'slug' => $data['category_slug'],
-                            'description' => $data['category_description'],
-                            'store_id' => $data['store_id'],
-                        ]);
-                        $isAccepted = true;
-                        $message = 'Category accepted and created';
-                    } else {
-                        $message = 'Category does not meet the required criteria';
-                    }
-                    break;
-                case 'product':
-                    // تحقق من معايير المنتج ورفعها
-                    if ($this->validateProduct($data)) {
-                        $product = Product::create([
-                            'name' => $data['product_name'],
-                            'description' => $data['product_description'],
-                            'price' => $data['product_price'],
-                            'store_id' => $data['store_id'],
-                        ]);
-                        // رفع الصور إذا كانت موجودة
-                        if (isset($data['product_images'])) {
-                            $images = is_array($data['product_images']) ? $data['product_images'] : explode(',', $data['product_images']);
-                            foreach ($images as $image) {
-                                $product->images()->create(['path' => $image]);
-                            }
-                        }
-                        $isAccepted = true;
-                        $message = 'Product accepted and created';
-                    } else {
-                        $message = 'Product does not meet the required criteria';
-                    }
-                    break;
-                case 'branches':
-                    // تحقق من معايير الفروع ورفعها
-                    if ($this->validateBranch($data)) {
-                        $branch = Branch::create([
-                            'name' => $data['branch_name'],
-                            'store_id' => $data['store_id'],
-                        ]);
-                        $isAccepted = true;
-                        $message = 'Branch accepted and created';
-                    } else {
-                        $message = 'Branch does not meet the required criteria';
-                    }
-                    break;
-                default:
-                    $message = 'Unknown notification type';
-            }
-
-            if ($isAccepted) {
-                $notification->status = 'accepted';
-                $notification->save();
-                return response()->json(['status' => 200, 'message' => $message]);
-            } else {
-                return response()->json(['status' => 400, 'message' => $message]);
-            }
-        }
-
-        return response()->json(['status' => 404, 'message' => 'Notification not found']);
-    }
-
-    public function rejectNotification(Request $request)
-    {
-        $notification = Notification::find($request->notification_id);
-        if ($notification) {
-            $notification->status = 'rejected';
-            $notification->save();
-            return response()->json(['status' => 200, 'message' => 'Notification rejected']);
-        }
-        return response()->json(['status' => 404, 'message' => 'Notification not found']);
-    }
-
-
-
     
 }

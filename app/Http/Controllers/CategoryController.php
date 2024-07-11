@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Notification;
@@ -83,94 +84,93 @@ class CategoryController extends Controller
      */
     public function store(Request $request, $id)
 {
-    try{
-
-    $validatedData = Validator::make($request->all(), [
-        'name' => 'required',
-        'slug' => 'required',
-        'description' => 'required',
-        'store_id' => 'required',
-    ]);
-
-    if ($validatedData->fails()) {
-        return response()->json([
-            'status' => 401,
-            'message' => $validatedData->errors()->first(),
+    try {
+        $validatedData = Validator::make($request->all(), [
+            'name' => 'required',
+            'slug' => 'required',
+            'description' => 'required',
+            'store_id' => 'required',
         ]);
-    }
-   
-    
-         // Check if category with same name or slug or both and store_id exists
-         $existingCategory = Category::where(function($query) use ($request) {
+
+        if ($validatedData->fails()) {
+            return response()->json([
+                'status' => 401,
+                'message' => $validatedData->errors()->first(),
+            ]);
+        }
+        
+        // التحقق من وجود الفئة بالاسم أو الـslug لنفس المتجر
+        $existingCategory = Category::where(function($query) use ($request) {
             $query->where('name', $request->name)
                   ->orWhere('slug', $request->slug);
         })
         ->where('store_id', $request->store_id)
         ->first();
 
-
-
         if ($existingCategory) {
             return response()->json([
                 'status' => 401,
-                'message' => 'Category with the same name already exists in this store.',
+                'message' => 'عذرًا، لا يمكنك القيام بهذا الامر يرجى التأكد من صحة البيانات المدخلة وسنحاول مرة أخرى لاحقاً',
             ]);
         }
-
-        // إنشاء الفئة مع الصورة إذا كانت متاحة، وإلا استخدام الصورة التمبلت
-        $category = Category::create([
-            'name' => $request->name,
-            'slug' => $request->slug,
-            'description' => $request->description,
-            'store_id' => $request->store_id,
-        ]);
+        
         
         $seller = SellerMan::findOrFail($id);
-                $sellerName = $seller->name;
+        $sellerName = $seller->name;
+        $sellerid = $seller->id;
 
+        
         $store = Store::findOrFail($request->store_id);
-                $storeName = $store->name;
+        $storeName = $store->name;
 
-
-         $tableName = (new Category)->getTable();
-                        
-
-
-        // Prepare data for notification
+        // تحضير البيانات للإشعار
         $data = [
             'category_name' => $request->name,
             'category_slug' => $request->slug,
             'category_description' => $request->description,
-            'category_created_by' => $sellerName,
-            'category_store' => $storeName,
+            'category_created_by' => $sellerid,
+            'category_store_id' => $request->store_id,
+            'category_store_name' => $storeName,
+            
         ];
 
-        // Send notification to admins
+        // التحقق من عدم تكرار نفس المحتوى في جدول الإشعارات
+        $existingNotification = DB::table('notifications')
+        ->where(function ($query) use ($data) {
+            $query->where('data', json_encode(['type' => 'category', 'data' => $data]));
+        })
+        ->first();
+
+    if ($existingNotification) {
+        return response()->json([
+            'status' => 401,
+            'message' => 'لا يمكن القيام بذلك لأنه قد تم بالفعل. يرجى الانتظار حتى تتم الموافقة على طلبك',
+        ]);
+    }
+        // إرسال الإشعار إلى المدراء
         $admins = Admin::all();
         Notification::send($admins, new GeneralNotification('category', $data));
-
-
 
         return response()->json([
             'status' => 200,
             'user' => $id,
             'sellerName'=> $sellerName,
             'storeName' =>$storeName,
-            'message' => 'Category added successfully',
+            'message' => 'تمت العملية بنجاح. يرجى الانتظار حتى الموافقة على طلبك.',
         ]);
     } catch (ValidationException $e) {
         return response()->json([
-            'status' => 401 ,
+            'status' => 401,
             'message' => $e->getMessage(),
         ]);
     } catch (\Exception $ex) {
         return response()->json([
-            'status' => 500 ,
+            'status' => 500,
             'message' => $ex->getMessage(),
         ]);
     }
-
 }
+
 public function edit($id)
 {
     try {
@@ -192,15 +192,12 @@ public function update(Request $request, $id)
 {
     $category = Category::findOrFail($id);
 
-
-    try{
-
+    try {
         $validatedData = Validator::make($request->all(), [
             'name' => 'required|regex:/^[\p{Arabic}\s]+$/u',
             'slug' => 'required|regex:/^[\p{Arabic}\s]+$/u',
             'description' => 'required|regex:/^[\p{Arabic}\s()-.,]+$/u',
             'store_id' => 'required',
-
         ]);
     
         if ($validatedData->fails()) {
@@ -210,42 +207,92 @@ public function update(Request $request, $id)
             ]);
         }
 
-   
+         // Prepare old data before update
+         $oldData = [
+            'category_name' => $category->name,
+            'category_slug' => $category->slug,
+            'category_description' => $category->description,
+            'category_store_id' => $category->store_id,
+            'category_store_name' => optional($category->store)->name, // اسم المتجر
+            'category_created_by' => optional(optional($category->store)->seller)->id, // اسم صاحب المتجر
+        ];
 
-    $category->update([
-        'name' => $request->name,
-        'slug' => $request->slug,
-        'description' => $request->description,
-        'store_id' => $request->store_id,
-    ]);
-    
+        // Fetch the store and seller information for the new data
+        $store = Store::with('seller')->findOrFail($request->store_id);
+        $storeName = $store->name;
+        $sellerName = $store->seller->name;
+        $sellerid = $store->seller->id;
 
-    $changes = $category->getChanges();
-    
-    if (empty($changes)) {
-        return response()->json(['message' => 'لم يتم حدوث اي تعديل ','status'=> 200 
-    ]);
-    
-   } 
+        // Prepare new data after update
+        $newData = [
+            'category_name' => $request->name,
+            'category_slug' => $request->slug,
+            'category_description' => $request->description,
+            'category_store_id' => $request->store_id,
+            'category_store_name' => $storeName, // اسم المتجر
+            'category_created_by' => $sellerid, // اسم صاحب المتجر
+        ];
 
-    return response()->json([
-        'status' => 200,
-        'message' => 'تم تحديث الفئة بنجاح',
-    ]);
+        // Check if there are any changes
+        $isModified = false;
+        foreach ($oldData as $key => $value) {
+            if ($newData[$key] != $value) {
+                $isModified = true;
+                break;
+            }
+        }
 
- } catch (ValidationException $e) {
-    return response()->json([
-        'status' => 401 ,
-        'message' => $e->getMessage(),
-    ]);
-} catch (\Exception $ex) {
-    return response()->json([
-        'status' => 500 ,
-        'message' => $ex->getMessage(),
-    ]);
+        if (!$isModified) {
+            return response()->json([
+                'status' => 200,
+                'isModified' => $isModified,
+                'old_data' => $oldData,
+                'new_data' => $newData,
+                'message' => 'لم يتم إجراء أي تغييرات.',
+            ]);
+        }
+        $data = [
+            'old_data' => $oldData,
+            'new_data' => $newData,
+        ];
+
+        // التحقق من عدم تكرار نفس المحتوى في جدول الإشعارات
+        $existingNotification = DB::table('notifications')
+        ->where(function ($query) use ($data) {
+            $query->where('data', json_encode(['type' => 'category', 'data' => $data]));
+        })
+        ->first();
+
+    if ($existingNotification) {
+        return response()->json([
+            'status' => 401,
+            'message' => 'لا يمكن القيام بذلك لأنه قد تم بالفعل. يرجى الانتظار حتى تتم الموافقة على طلبك',
+        ]);
+    }
+
+        // إرسال الإشعار إلى المدراء
+        $admins = Admin::all();
+        Notification::send($admins, new GeneralNotification('category', $data));
+
+        return response()->json([
+            'status' => 200,
+            'message' => 'تم تحديث الفئة بنجاح',
+        ]);
+
+    } catch (ValidationException $e) {
+        return response()->json([
+            'status' => 401,
+            'message' => $e->getMessage(),
+        ]);
+    } catch (\Exception $ex) {
+        return response()->json([
+            'status' => 500,
+            'message' => $ex->getMessage(),
+        ]);
+    }
 }
-           
-}
+
+
     
 
     /**

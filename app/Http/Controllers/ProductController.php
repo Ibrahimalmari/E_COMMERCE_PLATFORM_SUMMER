@@ -11,6 +11,7 @@ use App\Models\SellerMan;
 use App\Models\Store;
 use App\Notifications\GeneralNotification;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\File;
@@ -112,8 +113,7 @@ class ProductController extends Controller
             'message' => $validatedData->errors()->first(),
         ]);
     }
-
-    
+ 
 
     // Check if the image hash already exists in any of the specified tables and fields
     $imageHashes = [];
@@ -129,7 +129,7 @@ class ProductController extends Controller
     foreach ($tablesAndFieldsToCheck as $table => $fields) {
         foreach ($fields as $field) {
             if ($table::where($field, $imageHash)->exists()) {
-                throw new \Exception("Image already exists in the database.");
+                throw new \Exception("عذرًا، لا يمكنك القيام بهذا الامر يرجى التأكد من صحة البيانات المدخلة وسنحاول مرة أخرى لاحقاً");
             }
         }
     }
@@ -137,26 +137,13 @@ class ProductController extends Controller
             $store = Store::findOrFail($request->store_id);
             $storeName = $store->name;
 
+            $category_id = $request->category_id ?? null;
+            $branch_id = $request->branch_id ?? null;
 
             $imageHashes[] = $imageHash;
+            $image->move(public_path("products/"), $imageHash);
+
         }
-
-
-      $seller = Product::create([
-            'name' => $request->name,
-            'description'=> $request->description,
-            'price'=> $request->price,
-            'quantity'=> $request->quantity,
-            'phone'=> $request->phone,
-            'images' => implode(',', $imageHashes), // Assuming you're storing multiple image hashes as a comma-separated string
-            'category_id' => $request->category_id !== 'undefined' ? $request->category_id : null,
-            'store_id'=> $request->store_id,
-            'branch_id' => $request->branch_id !== 'undefined' ? $request->branch_id : null,
-            'created_by'=>$id,
-          ]);
-          $image->move(public_path("products/"), $imageHash);
-
-
           $category = Category::find($request->category_id);
         $categoryName = $category ? $category->name : 'N/A';
 
@@ -172,12 +159,31 @@ class ProductController extends Controller
               'product_name' => $request->name,
               'product_description' => $request->description,
               'product_price' => $request->price,
+              'product_quantity' => $request->quantity,
+              'product_store_id' => $request->store_id,
+              'product_category_id' =>$category_id,
+              'product_branch_id' => $branch_id,
               'product_store_name' => $storeName,
               'product_category_name' => $categoryName,
               'product_branch_name' => $branchName,
-              'product_created_by' => $sellerName,
-              'product_images' => $imageHashes,
+              'product_seller_name' => $sellerName,
+              'product_created_by' => $seller->id,
+              'product_images' => implode(',', $imageHashes), 
           ];
+
+           // التحقق من عدم تكرار نفس المحتوى في جدول الإشعارات
+           $existingNotification = DB::table('notifications')
+           ->where(function ($query) use ($data) {
+               $query->where('data', json_encode(['type' => 'product', 'data' => $data]));
+           })
+           ->first();
+   
+       if ($existingNotification) {
+           return response()->json([
+               'status' => 401,
+               'message' => 'لا يمكن القيام بذلك لأنه قد تم بالفعل. يرجى الانتظار حتى تتم الموافقة على طلبك',
+           ]);
+       }
   
           Notification::send($NotificationProduct, new GeneralNotification('product', $data));
 
@@ -185,7 +191,7 @@ class ProductController extends Controller
             'status' => 200, 
             'user' =>$id,
             'images'=>$request->images,
-            'message'=>'Product added successfully',
+            'message'=>'تمت العملية بنجاح. يرجى الانتظار حتى الموافق على طلبك.',
         ]);
 
     } catch (ValidationException $e) {
@@ -253,149 +259,164 @@ class ProductController extends Controller
      * @return \Illuminate\Http\Response
      */
     public function update(Request $request, $id)
-    {
-        try {
-            $product = Product::findOrFail($id);
-            
-            $validatedData = Validator::make($request->all(), [
-                'name' => 'required|regex:/^[\p{Arabic}\s]+$/u',
-                'description' => 'required|regex:/^[\p{Arabic}\s]+$/u',
-                'price' => 'required',
-                'store_id' => 'required',
-                'images.*' => 'image|mimes:jpeg,png,jpg,gif|max:2048', // قواعد الصور المتعددة
-            ]);
-    
-            if ($validatedData->fails()) {
-                return response()->json([
-                    'status' => 401,
-                    'message' => $validatedData->errors()->first(),
-                ]);
-            }
+{
+    $product = Product::findOrFail($id);
+    try{
+    $validatedData = Validator::make($request->all(), [
+        'name' => 'required|regex:/^[\p{Arabic}\s]+$/u',
+        'description' => 'required|regex:/^[\p{Arabic}\s]+$/u',
+        'price' => 'required',
+        'store_id' => 'required',
+        'images.*' => 'image|mimes:jpeg,png,jpg,gif|max:2048',
+    ]);
 
-            
-    
-            if ($request->hasFile('images')) {
+    if ($validatedData->fails()) {
+        return response()->json([
+            'status' => 401,
+            'message' => $validatedData->errors()->first(),
+        ]);
+    }
 
-      
-                // Check if the image hash already exists in any of the specified tables and fields
-                    $imageHashes = [];
-                    foreach ($request->file('images') as $image) {
-                    $imageHash = md5_file($image->path());
-                    $tablesAndFieldsToCheck = [
-                        SellerMan::class => ['PhotoOfPersonalID'],
-                        Store::class => ['coverPhoto'],
-                        DeliveryMan::class => ['PhotoOfPersonalID', 'vehicle_image', 'license_image'],
-                        Product::class => ['images'],
-                    ];
-                
-                    foreach ($tablesAndFieldsToCheck as $table => $fields) {
-                        foreach ($fields as $field) {
-                            if ($table::where($field, $imageHash)->exists()) {
-                                throw new \Exception("Image already exists in the database.");
-                            }
-                        }
-                    }
-                }   
-                    $store = Store::findOrFail($request->store_id);
-                    $storeName = $store->name;        
-    
-                // Delete old images if they exist
-            if ($product->images) {
-                $oldImages = explode(',', $product->images);
-                foreach ($oldImages as $oldImage) {
-                    $oldImagePath = public_path("products/".$oldImage);
-                    if (file_exists($oldImagePath)) {
-                        unlink($oldImagePath);
+    $oldImages = explode(',', $product->images);
+
+    $newImageHashes = [];
+    if ($request->hasFile('images')) {
+        $tablesAndFieldsToCheck = [
+            SellerMan::class => ['PhotoOfPersonalID'],
+            Store::class => ['coverPhoto'],
+            DeliveryMan::class => ['PhotoOfPersonalID', 'vehicle_image', 'license_image'],
+            Product::class => ['images'],
+        ];
+
+        foreach ($request->file('images') as $image) {
+            $imageHash = md5_file($image->path());
+            foreach ($tablesAndFieldsToCheck as $table => $fields) {
+                foreach ($fields as $field) {
+                    if ($table::where($field, $imageHash)->exists()) {
+                        throw new \Exception('عذرًا، لا يمكنك القيام بهذا الامر يرجى التأكد من صحة البيانات المدخلة وسنحاول مرة أخرى لاحقاً');
                     }
                 }
             }
 
-            // Upload new images
-           
-                foreach ($request->file('images') as $image) {
-                    if ($image->isValid()) { // التحقق من صحة الملف
-                        $imagePath = $image->path();
-                        if (file_exists($imagePath)) {
-                            $imageHash = md5_file($imagePath);
-                            $image->move(public_path("products/"), $imageHash);
+            if ($image->isValid()) {
+                $imagePath = $image->path();
+                if (file_exists($imagePath)) {
+                    $imageHash = md5_file($imagePath);
+                    $newImageHashes[] = $imageHash;
+                    $image->move(public_path("products/"), $imageHash);
 
-                            $imageHashes[] = $imageHash;
-                        } else {
-                            // التعامل مع حالة عدم وجود الملف
-                            throw new \Exception("Image file not found.");
-                        }
-                    } else {
-                        // التعامل مع الملفات غير الصالحة
-                        throw new \Exception("Invalid image file.");
-                    }
-                }    
-            
-
-        
-                $product->update([
-                    'images' => implode(',', $imageHashes), // استخدام implode لتحويل المصفوفة إلى سلسلة نصية مفصولة بفواصل
-                ]);
-                      
-        }
-    
-            $productData = [
-                'name' => $request->name,
-                'description' => $request->description,
-                'price' => $request->price,
-                'store_id' => $request->store_id,
-            ];
-            
-
-            // التحقق من أن القيم غير فارغة وهي أرقام صحيحة قبل إضافتها للتحديث
-            if (is_numeric($request->category_id)) {
-                $productData['category_id'] = $request->category_id;
+                } else {
+                    throw new \Exception("Image file not found.");
+                }
+            } else {
+                throw new \Exception("Invalid image file.");
             }
-            
-            if (is_numeric($request->branch_id)) {
-                $productData['branch_id'] = $request->branch_id;
-            }
-            
-            
-            
-            $product->update($productData);
-            
-            
-            
-            
-
-            $changes = $product->getChanges();
-    
-            if (empty($changes)) {
-                return response()->json(['message' => 'لم يتم حدوث اي تعديل ',
-                'status'=> 200 ,
-                'images'=>$request->images,
-
-            ]);
-            
-           } 
-    
-            return response()->json([
-                'status' => 200,
-                'images'=>$request->images,
-                'message' => 'Product updated successfully',
-            ]);
-    
-        } catch (ValidationException $e) {
-            return response()->json([
-                'status' => 401,
-                'message' => $e->getMessage(),
-            ]);
-        } catch (\Exception $ex) {
-            return response()->json([
-                'status' => 500,
-                'message' => $ex->getMessage(),
-            ]);
         }
     }
-    
 
-    
+    $category_id = $request->category_id ?? null;
+    $branch_id = $request->branch_id ?? null;
 
+    $store = Store::find($product->store_id);
+    $seller_id = $store ? $store->seller_id : null;
+
+    $oldData = [
+        'product_name' => $product->name,
+        'product_description' => $product->description,
+        'product_price' => (double)$product->price,
+        'product_quantity' => (int)$product->quantity,
+        'product_store_id' => (int)$product->store_id,
+        'product_store_name' => $product->store ? $product->store->name : null,
+        'product_seller_name' => $product->store && $product->store->seller ? $product->store->seller->name : null,
+        'product_created_by' => $seller_id,
+        'product_category_id' => (int)$product->category_id,
+        'product_category_name' => $product->category ? $product->category->name : null,
+        'product_branch_id' =>(int)$product->branch_id,
+        'product_branch_name' => $product->branch ? $product->branch->name : null,
+        'product_images' => implode(',', $oldImages),
+    ];
+
+    $newData = [
+        'product_name' => $request->name,
+        'product_description' => $request->description,
+        'product_price' => (double)$request->price,
+        'product_quantity' => (int)$request->quantity,
+        'product_store_id' => (int)$request->store_id,
+        'product_store_name' => Store::find($request->store_id) ? Store::find($request->store_id)->name : null,
+        'product_created_by' => $seller_id,
+        'product_seller_name' => Store::find($request->store_id) && Store::find($request->store_id)->seller ? Store::find($request->store_id)->seller->name : null,
+        'product_category_id' => (int)$category_id,
+        'product_category_name' => $request->has('category_id') && Category::find($request->category_id) ? Category::find($request->category_id)->name : ($product->category ? $product->category->name : null),
+        'product_branch_id' =>  (int)$branch_id,
+        'product_branch_name' => $request->has('branch_id') && Branch::find($request->branch_id) ? Branch::find($request->branch_id)->name : ($product->branch ? $product->branch->name : null),
+        'product_images' => implode(',', $newImageHashes),
+    ];
+
+   if(!$newImageHashes){
+    $newData['product_images'] = implode(',', $oldImages);
+   }
+    $isModified = false;
+    foreach ($oldData as $key => $value) {
+        if ($newData[$key] != $value) {
+            $isModified = true;
+            break;
+        }
+    }
+
+    if (!$isModified) {
+        return response()->json([
+            'status' => 200,
+            'isModified' => $isModified,
+            'old_data' => $oldData,
+            'new_data' => $newData,
+            'message' => 'لم يتم إجراء أي تغييرات.',
+        ]);
+    }
+
+    $data = [
+        'old_data' => $oldData,
+        'new_data' => $newData,
+    ];
+
+    $existingNotification = DB::table('notifications')
+        ->where(function ($query) use ($data) {
+            $query->where('data', json_encode(['type' => 'product', 'data' => $data]));
+        })
+        ->first();
+
+    if ($existingNotification) {
+        return response()->json([
+            'status' => 401,
+            'message' => 'لا يمكن القيام بذلك لأنه قد تم بالفعل. يرجى الانتظار حتى تتم الموافقة على طلبك',
+        ]);
+    }
+
+    $admins = Admin::all();
+    Notification::send($admins, new GeneralNotification('product', $data));
+
+    return response()->json([
+        'status' => 200,
+        'isModified' => $isModified,
+        'old_data' => $oldData,
+        'new_data' => $newData,
+        'message' => 'تمت العملية بنجاح. يرجى الانتظار حتى الموافقة على طلبك.',
+    ]);
+
+} catch (ValidationException $e) {
+    return response()->json([
+        'status' => 401 ,
+        'message' => $e->getMessage(),
+    ]);
+} catch (\Exception $ex) {
+    return response()->json([
+        'status' => 500 ,
+        'message' => $ex->getMessage(),
+    ]);
+}
+
+}
+
+        
     /**
      * Remove the specified resource from storage.
      *

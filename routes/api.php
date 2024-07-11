@@ -11,6 +11,7 @@ use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\DiscountController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SectionController;
@@ -114,6 +115,7 @@ Route::controller(SellerController::class)->group(function () {
         Route::post('/forgetpassword','sendPasswordResetEmail');
         Route::post('/resetpassword','updatePassword');
         Route::get('/verifyaccountseller/{id}', 'verifyAccountseller');
+        Route::get('/seller/notifications/{id}',  'getSellerNotifications');
 
     Route::middleware(['auth:sanctum'])->group(function () {
         Route::post('/sellerlogout/{id}', 'Logout');
@@ -131,11 +133,19 @@ Route::controller(AdminController::class)->group(function () {
     Route::post('/ResetPassword','updatePassword');
     Route::get('/verifyaccountadmin/{id}', 'verifyAccountadmin');
     Route::get('/Notification', 'ShowNotifications');
-    Route::post('admin/approve/{type}/{id}', 'approve');
-    Route::post('admin/reject/{type}/{id}', 'reject');
  Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/adminlogout/{id}', 'Logout');
     });
+
+});
+
+Route::controller(NotificationController::class)->group(function () {
+    Route::post('/notification/accept/{notification_id}/{notifiable_id}', 'acceptNotification');
+    Route::post('/notification/reject/', 'rejectNotification');
+    Route::post('/notification/reject-all',  'rejectAllNotifications');
+    Route::get('/seller/notifications', 'getSellerNotifications');
+    Route::post('/notification/markAllAsRead', 'markAllAsRead');
+
 
 });
 

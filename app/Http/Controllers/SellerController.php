@@ -6,6 +6,7 @@ use App\Events\VerifyRegisterSeller;
 use App\Mail\ResetPassword;
 use App\Models\Category;
 use App\Models\DeliveryMan;
+use App\Models\Notification;
 use App\Models\Product;
 use App\Models\SellerMan;
 use App\Models\Store;
@@ -36,6 +37,19 @@ class SellerController extends Controller
             'message'=>'Registered Successfully',
         ]); 
     
+    }
+
+    public function getSellerNotifications($id)
+    {
+        // جلب الإشعارات الخاصة بالبائع بناءً على معرف المستخدم (ID)
+        $notifications = Notification::where('notifiable_id', $id)
+        ->where('notifiable_type', 'App\Models\SellerMan')
+        ->get();
+
+        return response()->json([
+            'status' => 200,
+            'notifications' => $notifications
+        ]);
     }
 
 
