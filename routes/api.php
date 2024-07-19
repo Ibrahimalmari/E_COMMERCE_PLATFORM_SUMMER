@@ -7,6 +7,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\BrunchController;
+use App\Http\Controllers\CartController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DeliveryController;
@@ -60,6 +61,8 @@ Route::get('/user-stats', [UserController::class, 'getUserStats']);
 Route::controller(StoreController::class)->group(function () {     
     Route::get('/allstore','index_admin');
     Route::get('/displaystore/{id}','index_seller');
+    Route::get('/DisplayStoreToCustomer/{id}','DisplayStoreToCustomer');
+    Route::get('/store/getStoreDetails/{store_id}','getStoreDetails');
     Route::post('/StoreAdd/{id}','store');
     Route::get('/store/{id}','edit');
     Route::put('/updatestore/{id}','update');
@@ -69,6 +72,7 @@ Route::controller(StoreController::class)->group(function () {
 Route::controller(ProductController::class)->group(function () {  
     Route::get('/allproduct','index_admin');
     Route::get('/displayproduct/{id}','index_seller'); 
+    Route::get('/displaydetailsProduct/{id}', 'displaydetailsProduct');
     Route::post('/ProductAdd/{id}','store');
     Route::get('/product/{id}','edit');
     Route::put('/updateproduct/{id}','update');
@@ -179,6 +183,17 @@ Route::controller(CustomerController::class)->group(function () {
     Route::middleware('auth:sanctum')->post('/logout',  'logout');
 });
 
+
+Route::controller(CartController::class)->group(function () {      
+
+    Route::post('/cart/add','addToCart');
+    Route::get('/checkCart/{customerId}/{storeId}','checkCart');
+    Route::delete('/removeCart/{customerId}/{storeId}', 'removeCart');
+    Route::get('/customer/cart/{customerId}',  'DisplayProductInCartForCustomer');
+    Route::post('/cart/update-quantity/{id}',  'updateQuantity');
+    Route::delete('/cart/remove-item/{id}',  'removeItem');
+
+});
 
 
 Route::controller(AddressController::class)->group(function () {      

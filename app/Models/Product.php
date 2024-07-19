@@ -20,7 +20,6 @@ class Product extends Model
         'store_id',
     ];
 
-    protected $with = ['store', 'category', 'branch'];
 
  public function store(){
     return  $this->belongsTo(store::class ,"store_id" , "id");
@@ -30,9 +29,10 @@ public function category(){
    return  $this->belongsTo(Category::class,"category_id" , "id");
 }
 
-public function branch(){
-    return  $this->belongsTo(Branch::class,"branch_id" , "id");
- }
+public function branch()
+{
+    return $this->belongsTo(Branch::class);
+}
 
 
  public function cartitem(){

@@ -14,12 +14,15 @@ class Branch extends Model
         'category_id',
     ];
 
-    protected $with=['category'];
 
     public function category(){
         return $this->belongsTo(Category::class, 'category_id', 'id');
     }
 
+    public function products()
+    {
+        return $this->hasMany(Product::class);
+    }
      public function categoryplus(){
         return  $this->belongsTo(Category::class);
      }

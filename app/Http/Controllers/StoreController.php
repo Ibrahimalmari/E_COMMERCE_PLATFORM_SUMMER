@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Log;
 
 class StoreController extends Controller
 {
@@ -41,6 +42,49 @@ class StoreController extends Controller
            'message'=>' Successfully',
        ]);
     }
+
+    public function DisplayStoreToCustomer($storeId)
+    {
+        try {
+            // استرداد بيانات المتجر من قاعدة البيانات أو من خلال أي خدمة
+            $store = Store::find($storeId); // توقع أنه يمكنك استخدام مثل هذا النموذج
+            
+            if (!$store) {
+                return response()->json(['error' => 'Store not found'], 404);
+            }
+
+            return response()->json(['store' => $store]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Failed to fetch store details', 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    
+    public function getStoreDetails($store_id)
+    {
+        try {
+            // جلب بيانات المتجر
+            $store = Store::findOrFail($store_id);
+    
+            // جلب الفئات والأفراع والمنتجات المرتبطة بالمتجر
+            $categories = Category::where('store_id', $store_id)
+                ->with(['branches.products']) // تأكد من استخدام 'products' بدلاً من 'product'
+                ->get();
+    
+            return response()->json([
+                'store' => $store,
+                'categories' => $categories,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error fetching store details: ' . $e->getMessage());
+            return response()->json(['error' => 'Failed to fetch store details.'], 500);
+        }
+    }
+    
+    
+    
+    
+
 
     /**
      * Show the form for creating a new resource.

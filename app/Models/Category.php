@@ -17,16 +17,15 @@ class Category extends Model
       'store_id',
   ];
 
-    
+
     public function product(){
       return  $this->hasMany(Product::class);
     }
 
-    public function branch(){
-      return $this->hasMany(Branch::class, 'category_id', 'id');
-  }
-
-    protected  $with = ['store'];
+    public function branches()
+    {
+        return $this->hasMany(Branch::class);
+    }
 
     public function store()
     {

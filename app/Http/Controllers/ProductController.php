@@ -77,6 +77,13 @@ class ProductController extends Controller
             ], 500);
         }
     }
+
+    public function displaydetailsProduct($id)  /// من اجل عرض المنتج لعميل لاضافة السلة 
+    {
+        $product = Product::findOrFail($id); // استرجاع التفاصيل باستخدام معرف المنتج
+        return response()->json(['product' => $product]);
+    }
+ 
     
 
     /**
