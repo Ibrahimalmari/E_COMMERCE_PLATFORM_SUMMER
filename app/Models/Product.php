@@ -20,6 +20,7 @@ class Product extends Model
         'store_id',
     ];
 
+ protected $with = ['category', 'branch', 'store']; 
 
  public function store(){
     return  $this->belongsTo(store::class ,"store_id" , "id");
@@ -31,7 +32,7 @@ public function category(){
 
 public function branch()
 {
-    return $this->belongsTo(Branch::class);
+    return $this->belongsTo(Branch::class ,"branch_id" , "id");
 }
 
 

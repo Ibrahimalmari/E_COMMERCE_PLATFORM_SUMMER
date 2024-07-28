@@ -48,6 +48,10 @@ class Store extends Model
         return $this->belongsTo(Admin::class);
      }   
 
+     public function carts()
+     {
+         return $this->hasMany(Cart::class);
+     }
 
      // علاقة الخصم بالمتجر
     public function discount()

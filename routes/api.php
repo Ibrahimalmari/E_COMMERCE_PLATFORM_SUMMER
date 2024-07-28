@@ -6,13 +6,13 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\BranchController;
-use App\Http\Controllers\BrunchController;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\DiscountController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SectionController;
@@ -189,7 +189,7 @@ Route::controller(CartController::class)->group(function () {
     Route::post('/cart/add','addToCart');
     Route::get('/checkCart/{customerId}/{storeId}','checkCart');
     Route::delete('/removeCart/{customerId}/{storeId}', 'removeCart');
-    Route::get('/customer/cart/{customerId}',  'DisplayProductInCartForCustomer');
+    Route::get('/customer/cart/{customerId}/{storeId}',  'DisplayProductInCartForCustomer');
     Route::post('/cart/update-quantity/{id}',  'updateQuantity');
     Route::delete('/cart/remove-item/{id}',  'removeItem');
 
@@ -203,3 +203,15 @@ Route::controller(AddressController::class)->group(function () {
 
 });
 
+Route::controller(OrderController::class)->group(function () {      
+
+Route::post('/orders','store');
+Route::get('/orders/{id}','show');
+Route::post('/orders/status/{id}',  'updateStatus'); // Route لتحديث حالة الطلب
+Route::post('/accept-order-creation',  'acceptOrderCreation');
+Route::post('/reject-order-creation',  'rejectOrderCreation');
+Route::get('/ForShowMyOrderToCustomer','ForShowMyOrderToCustomer');
+
+
+
+});

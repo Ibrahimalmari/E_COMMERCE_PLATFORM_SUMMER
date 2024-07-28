@@ -15,15 +15,26 @@ return new class extends Migration
     {
         Schema::create('orders', function (Blueprint $table) {
             $table->id();
+            $table->string('order_numbers')->unique(); // إضافة العمود الجديد
             $table->string('additional_info')->nullable();
+            $table->text('delivery_notes')->nullable(); 
+            $table->double('delivery_fee')->nullable();
+            $table->double('discount')->nullable(); 
             $table->double('invoice_amount')->nullable();; 
-            $table->tinyInteger('order_status')->nullable();; 
+            $table->enum('order_status', [
+                'تم استلام الطلب',
+                'الطلب قيد التجهيز',
+                'الطلب جاهز للتوصيل',
+                'الطلب في مرحلة التوصيل',
+                'تم تسليم الطلب'
+            ])->default('تم استلام الطلب');         
             $table->string('pay_way')->nullable();;
             $table->double('tax')->nullable();;
             $table->double('tip')->nullable();; 
             $table->foreignId('cart_id')->constrained('carts')->onUpdate('cascade')->onDelete('cascade');
             $table->foreignId('customer_id')->constrained('customers')->onUpdate('cascade')->onDelete('cascade');
             $table->foreignId('store_id')->constrained('stores')->onUpdate('cascade')->onDelete('cascade');
+            $table->foreignId('address_id')->constrained('addresses')->onUpdate('cascade')->onDelete('cascade'); 
             $table->timestamps();
         });
     }
@@ -36,5 +47,6 @@ return new class extends Migration
     public function down()
     {
         Schema::dropIfExists('orders');
+      
     }
 };

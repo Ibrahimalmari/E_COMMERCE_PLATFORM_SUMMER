@@ -3,17 +3,17 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Model;
 use Laravel\Sanctum\HasApiTokens;
-use Tymon\JWTAuth\Contracts\JWTSubject;
+use Illuminate\Foundation\Auth\User as Authenticatable;
 
-class Customer extends Authenticatable implements JWTSubject
+use Illuminate\Notifications\Notifiable;
+
+class Customer extends Authenticatable
 {
-    use HasFactory, HasApiTokens, Notifiable;
+    use HasFactory ,HasApiTokens , Notifiable ;
 
-    protected $guard = 'customer';
-
+    protected $guard ='customer';
     protected $fillable = [
         'name',
         'email',
@@ -21,36 +21,29 @@ class Customer extends Authenticatable implements JWTSubject
         'gender',
         'phone',
         'DateOfBirth',
-        'verification_code',
+        'verification_code'
     ];
 
+  
+ 
     protected $casts = [
         'email_verified_at' => 'datetime',
     ];
 
-    protected $hidden = [
+     protected $hidden = [
         'password',
         'remember_token',
     ];
 
-    public function orders()
-    {
+    public function order(){
         return $this->hasMany(Order::class);
-    }
+     }
 
-    public function addresses()
-    {
-        return $this->hasMany(Address::class);
-    }
+     public function address(){
+        return $this->hasOne(Address::class);
+     }
+     
 
-    // JWTSubject methods
-    public function getJWTIdentifier()
-    {
-        return $this->getKey();
-    }
+   
 
-    public function getJWTCustomClaims()
-    {
-        return [];
-    }
 }

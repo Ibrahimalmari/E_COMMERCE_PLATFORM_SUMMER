@@ -15,9 +15,12 @@ return new class extends Migration
     {
         Schema::create('carts', function (Blueprint $table) {
             $table->id();
-            $table->double('total_price')->nullable();; 
+            $table->double('total_price')->nullable();
+            $table->unsignedBigInteger('store_id')->nullable();
+            $table->foreign('store_id')->references('id')->on('stores')->onDelete('set null');
             $table->foreignId('customer_id')->constrained('customers')->onUpdate('cascade')->onDelete('cascade');
-            $table->string('user_note')->nullable();; 
+            $table->string('user_note')->nullable();
+            $table->enum('status', ['completed', 'uncompleted'])->default('uncompleted');
             $table->timestamps();
         });
     }

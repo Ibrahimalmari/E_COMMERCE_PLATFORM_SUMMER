@@ -13,18 +13,30 @@ class CartController extends Controller
 {
     public function addToCart(Request $request)
     {
-        // الحصول على أو إنشاء عربة التسوق للمستخدم الحالي
-        $cart = Cart::firstOrCreate(
-            ['customer_id' => Auth::guard('api')->id()],
-            ['total_price' => 0]
-        );
-
+        $customerId = Auth::guard('api')->id();
+    
         // البحث عن المنتج
         $product = Product::findOrFail($request->product_id);
-
+        $storeId = $product->store_id;
+    
+        // البحث عن السلة الحالية للمستخدم التي ليست مكتملة ولها نفس store_id
+        $cart = Cart::where('customer_id', $customerId)
+                    ->where('status', '!=', 'completed')
+                    ->where('store_id', $storeId)
+                    ->first();
+    
+        // إذا لم يتم العثور على سلة غير مكتملة بنفس store_id، إنشاء سلة جديدة
+        if (!$cart) {
+            $cart = Cart::create([
+                'customer_id' => $customerId,
+                'total_price' => 0,
+                'store_id' => $storeId, // تعيين store_id
+            ]);
+        }
+    
         // حساب سعر العناصر
         $items_price = $product->price * $request->quantity;
-
+    
         // إضافة عنصر إلى عربة التسوق
         $cartItem = CartItem::create([
             'cart_id' => $cart->id,
@@ -33,20 +45,27 @@ class CartController extends Controller
             'items_price' => $items_price,
             'notes' => $request->notes,
         ]);
-
+    
         $cart->total_price += $items_price;
         $cart->save();
-
+    
         return response()->json(['message' => 'Product added to cart successfully!', 'cart' => $cart, 'cartItem' => $cartItem], 201);
     }
+    
 
 
     public function checkCart($customerId, $storeId)
     {
-        // ابحث عن السلة للمستخدم
-        $cart = Cart::where('customer_id', $customerId)->first();
-
-        if ($cart) {
+        // جلب جميع السلات غير المكتملة الخاصة بالمستخدم
+        $carts = Cart::where('customer_id', $customerId)
+            ->where('status', '!=', 'completed') // تجاهل السلات المكتملة
+            ->get();
+    
+        $totalQuantity = 0;
+        $totalPrice = 0;
+        $cartStatus = 'none'; // حالة السلة الافتراضية
+    
+        foreach ($carts as $cart) {
             // تحقق من وجود عناصر في السلة مرتبطة بالمتجر المحدد
             $cartItems = CartItem::where('cart_id', $cart->id)
                 ->whereHas('product', function($query) use ($storeId) {
@@ -54,31 +73,41 @@ class CartController extends Controller
                 })
                 ->with('product') // تأكد من جلب بيانات المنتج
                 ->get();
-
+    
             if ($cartItems->count() > 0) {
-                $totalQuantity = $cartItems->sum('quantity');
-                $totalPrice = $cartItems->sum(function($item) {
+                $totalQuantity += $cartItems->sum('quantity');
+                $totalPrice += $cartItems->sum(function($item) {
                     return $item->product->price * $item->quantity; // احصل على السعر من المنتج المرتبط
                 });
-
-                return response()->json([
-                    'exists' => true,
-                    'totalQuantity' => $totalQuantity,
-                    'totalPrice' => $totalPrice,
-                ]);
+    
+                // افتراض أن حالة السلة الأخيرة هي ما نحتاجه
+                $cartStatus = $cart->status;
             }
         }
-
+    
+        if ($totalQuantity > 0) {
+            return response()->json([
+                'exists' => true,
+                'cartStatus' => $cartStatus,
+                'totalQuantity' => $totalQuantity,
+                'totalPrice' => $totalPrice,
+            ]);
+        }
+    
         return response()->json(['exists' => false]);
     }
-
+    
+    
     public function removeCart($customerId, $storeId)
-    {
-        try {
-            // ابحث عن السلة للمستخدم
-            $cart = Cart::where('customer_id', $customerId)->first();
+{
+    try {
+        // جلب جميع السلات غير المكتملة للمستخدم
+        $carts = Cart::where('customer_id', $customerId)
+            ->where('status', '!=', 'completed')
+            ->get();
 
-            if ($cart) {
+        if ($carts->count() > 0) {
+            foreach ($carts as $cart) {
                 // تحقق من وجود عناصر في السلة مرتبطة بالمتجر المحدد
                 $cartItems = CartItem::where('cart_id', $cart->id)
                     ->whereHas('product', function($query) use ($storeId) {
@@ -94,36 +123,59 @@ class CartController extends Controller
                         })
                         ->delete();
 
-                    // بعد حذف العناصر، قم بحذف السلة نفسها
-                    $cart->delete();
-
-                    return response()->json(['message' => 'تم حذف السلة والسجل بنجاح'], 200);
-                } else {
-                    return response()->json(['message' => 'لا توجد عناصر في السلة للمتجر المحدد'], 404);
+                    // بعد حذف العناصر، تحقق مما إذا كانت السلة فارغة الآن
+                    if (CartItem::where('cart_id', $cart->id)->count() == 0) {
+                        // إذا كانت السلة فارغة، احذف السلة نفسها
+                        $cart->delete();
+                    }
                 }
-            } else {
-                return response()->json(['message' => 'لم يتم العثور على سلة للمستخدم المحدد'], 404);
             }
-        } catch (\Exception $e) {
-            return response()->json(['message' => 'خطأ في حذف السلة والسجل', 'error' => $e->getMessage()], 500);
+
+            return response()->json(['message' => 'تم حذف السلات غير المكتملة الخاصة بالمتجر بنجاح'], 200);
+        } else {
+            return response()->json(['message' => 'لا توجد سلات غير مكتملة للمستخدم المحدد'], 404);
         }
+    } catch (\Exception $e) {
+        return response()->json(['message' => 'خطأ في حذف السلات غير المكتملة الخاصة بالمتجر', 'error' => $e->getMessage()], 500);
+    }
+}
+
+
+public function displayProductInCartForCustomer($customerId, $storeId)
+{
+    // ابحث عن جميع السلال غير المكتملة للمستخدم
+    $carts = Cart::where('customer_id', $customerId)
+                ->where('status', '!=', 'completed')
+                ->get();
+
+    if ($carts->isEmpty()) {
+        return response()->json(['cart' => [], 'message' => 'No incomplete carts found.'], 200); // لا توجد سلة للمستخدم
     }
 
-    public function displayProductInCartForCustomer($customerId)
-    {
-        // استرجاع المنتجات التي تنتمي إلى العميل المسجل الدخول، مع جلب بيانات المتجر لكل منتج
-        $cartItems = CartItem::whereHas('cart', function ($query) use ($customerId) {
-            $query->where('customer_id', $customerId);
-        })->with(['product', 'product.store'])->get();
-    
-        // تضمين اسم المتجر في الاستجابة
-        $cartItems = $cartItems->map(function ($cartItem) {
-            $cartItem->product->store_name = $cartItem->product->store->name;
-            return $cartItem;
-        });
-    
-        return response()->json(['cart' => $cartItems], 200);
+    // اجمع كل عناصر السلال غير المكتملة
+    $cartItems = CartItem::whereIn('cart_id', $carts->pluck('id'))
+                          ->whereHas('product', function ($query) use ($storeId) {
+                              $query->where('store_id', $storeId);
+                          })
+                          ->with(['product', 'product.store'])
+                          ->get();
+
+    if ($cartItems->isEmpty()) {
+        return response()->json(['cart' => [], 'message' => 'No items found for this store.'], 200); // لا توجد عناصر في السلة
     }
+
+    // تضمين اسم المتجر في الاستجابة
+    $cartItems = $cartItems->map(function ($cartItem) {
+        $cartItem->product->store_name = $cartItem->product->store->name;
+        return $cartItem;
+    });
+
+    return response()->json([
+        'cart' => $cartItems,
+        'store_name' => $cartItems->first()->product->store_name
+    ], 200);
+}
+
     
 
 

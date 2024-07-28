@@ -14,18 +14,25 @@ class Cart extends Model
         'total_price',
         'customer_id',
         'user_note',
+        'status',
+        'store_id', 
     ];
 
     public function customer(){
         return $this->belongsTo(Customer::class);
      }
 
-     public function cartitem(){
+     public function items(){
         return $this->hasMany(CartItem::class);
      }
 
      public function order(){
         return $this->hasMany(Order::class);
+     }
+     
+     public function store()
+     {
+         return $this->belongsTo(Store::class);
      }
 
 

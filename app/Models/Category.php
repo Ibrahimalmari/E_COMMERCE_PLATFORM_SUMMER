@@ -17,6 +17,8 @@ class Category extends Model
       'store_id',
   ];
 
+  protected $with = ['store']; 
+
 
     public function product(){
       return  $this->hasMany(Product::class);

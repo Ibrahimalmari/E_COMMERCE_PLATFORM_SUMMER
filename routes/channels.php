@@ -13,6 +13,18 @@ use Illuminate\Support\Facades\Broadcast;
 |
 */
 
-Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
-    return (int) $user->id === (int) $id;
+// في ملف `routes/channels.php`
+Broadcast::channel('my-event', function () {
+    return true;
 });
+
+
+Broadcast::channel('my-event-customer', function () {
+    return true;
+});
+
+
+
+
+
+
