@@ -5,9 +5,19 @@ namespace App\Http\Controllers;
 use App\Events\MyEvent;
 use App\Events\MyEventToCustomer;
 use App\Events\OrderCreated;
+use App\Events\OrderReadyForDelivery;
+use App\Events\OrderReadyForDeliveryNew;
+use App\Models\Address;
 use App\Models\Cart;
+use App\Models\CartItem;
+use App\Models\Customer;
+use App\Models\DeliveryMan;
+use App\Models\DeliveryMenOrder;
+use App\Models\Notification;
 use App\Models\Order;
 use App\Models\Store;
+use App\Notifications\NotificationOrder;
+use App\Notifications\OrderReadyNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Database\QueryException;
@@ -224,17 +234,72 @@ public function rejectOrderCreation()
         $validated = $request->validate([
             'order_status' => 'required|string|in:' . implode(',', Order::getStatuses()),
         ]);
-
+    
         try {
-            $order = Order::findOrFail($id);
+            // جلب الطلب مع كافة العلاقات المرتبطة
+            $order = Order::with(['cart.items.product', 'address', 'customer', 'store'])->findOrFail($id);
+            $oldStatus = $order->order_status;
             $order->order_status = $validated['order_status'];
             $order->save();
+    
+            // تحقق إذا كانت الحالة الجديدة هي "الطلب جاهز للتوصيل"
+            if ($order->order_status === 'الطلب جاهز للتوصيل') {
+                // جلب معلومات العميل، والعنوان، والمتجر من العلاقات المضمنة
+                $customer = $order->customer;
+                $address = $order->address;
+                $store = $order->store;
+    
+                // الحصول على العناصر وتفاصيل المنتج
+                $cartItems = $order->cart->items->map(function($item) {
+                    return [
+                        'id' => $item->id,
+                        'quantity' => $item->quantity,
+                        'product' => [
+                            'name' => $item->product->name,
+                            'price' => $item->product->price,
+                            'description' => $item->product->description, // افتراض وجود وصف للمنتج
+                        ],
+                        'items_price' => $item->items_price, // سعر العنصر في السلة
+                    ];
+                });
+    
+                $notificationData = [
+                    'order_id' => $order->id,
+                    'customer_name' => $customer->name,
+                    'address' => $address->address,
+                    'store' => [
+                        'name' => $store->name,
+                        'latitude' => $store->latitude,
+                        'longitude' => $store->longitude,
+                    ],
+                    'cart_items' => $cartItems->toArray(), // تحويل العناصر إلى مصفوفة لتخزينها
+                ];
+    
+                
+                $connectedWorkers = DeliveryMan::where('status', 'متصل')->get(); // جلب العمال المتصلين
 
+                // إرسال إشعار لكل عامل متصل
+                foreach ($connectedWorkers as $worker) {
+                    $worker->notify(new OrderReadyNotification($order, $notificationData));
+                }
+    
+                // إرسال الحدث مع جميع المعاملات
+                event(new OrderReadyForDelivery($order, $customer, $address, $cartItems, $store, $connectedWorkers));
+            }
+    
+            if ($order->order_status === 'تم تسليم الطلب' && $oldStatus !== 'تم تسليم الطلب') {
+                // حذف إشعار الطلب من جدول الإشعارات
+                Notification::where('type', OrderReadyNotification::class)
+                            ->where('data', 'like', '%"order_id":' . $order->id . '%')
+                            ->delete();
+            }
+    
             return response()->json([
                 'success' => true,
                 'message' => 'Order status updated successfully',
                 'data' => $order,
             ]);
+    
         } catch (QueryException $e) {
             return response()->json([
                 'success' => false,
@@ -247,6 +312,88 @@ public function rejectOrderCreation()
             ], 500);
         }
     }
+    
+    
+
+    
+    
+
+
+    public function acceptOrderForDelivery(Request $request)
+{
+    // التحقق من صحة البيانات
+    $request->validate([
+        'order_id' => 'required',
+        'delivery_worker_id' => 'required',
+    ]);
+
+    $orderId = $request->input('order_id');
+    $deliveryWorkerId = $request->input('delivery_worker_id');
+
+    try {
+        // تحديث السجل بناءً على order_id
+        $order = Order::find($orderId);
+
+        if ($order) {
+            // تحديث الطلب بتعيين عامل التوصيل
+            $order->delivery_worker_id = $deliveryWorkerId;
+            $order->save();
+
+            // إدخال سجل جديد في جدول delivery_men_orders باستخدام Eloquent
+            $deliveryMenOrder = new DeliveryMenOrder();
+            $deliveryMenOrder->delivery_men_id = $deliveryWorkerId;
+            $deliveryMenOrder->order_id = $orderId;
+            $deliveryMenOrder->status = 'مقبول'; // حالة الطلب يمكن تعديلها حسب الحاجة
+            $deliveryMenOrder->save();
+
+            return response()->json(['message' => 'تم تحديث الطلب وإضافة السجل بنجاح.'], 200);
+        } else {
+            return response()->json(['message' => 'طلب غير موجود.'], 404);
+        }
+    } catch (\Exception $e) {
+        // إعادة الرسالة الأصلية للخطأ
+        return response()->json([
+            'message' => 'حدث خطأ أثناء تحديث الطلب.',
+            'error' => $e->getMessage(),
+            'line' => $e->getLine(),
+            'file' => $e->getFile(),
+        ], 500);
+    }
+}
+
+    
+
+
+public function rejectOrderForDelivery(Request $request)
+{
+    // التحقق من صحة البيانات
+    $request->validate([
+        'order_id' => 'required',
+        'delivery_worker_id' => 'required',
+    ]);
+
+    $orderId = $request->input('order_id');
+    $deliveryWorkerId = $request->input('delivery_worker_id');
+
+    try {
+        // تحديث السجل بناءً على order_id
+        $order = Order::find($orderId);
+
+        if ($order) {
+            // تعيين حالة الطلب إلى "جاهز للتوصيل" وإلغاء تعيين delivery_worker_id
+            $order->order_status = 'الطلب جاهز للتوصيل';
+            $order->delivery_worker_id = null; // تعيينها إلى null
+            $order->save();
+            
+            return response()->json(['message' => 'تم تحديث حالة الطلب بنجاح.'], 200);
+        } else {
+            return response()->json(['message' => 'طلب غير موجود.'], 404);
+        }
+    } catch (\Exception $e) {
+        return response()->json(['message' => 'حدث خطأ أثناء تحديث الطلب.'], 500);
+    }
+}
+
 
     /**
      * Display the specified resource.
@@ -311,7 +458,117 @@ public function rejectOrderCreation()
     
 
     
+    public function getOrderDetails($orderId)
+{
+    $customerId = Auth::guard('api')->id(); // احصل على معرف المستخدم المسجل
+
+    // احصل على تفاصيل الطلب بناءً على معرف الطلب ومعرف العميل
+    $order = Order::with(['cart.items.product.store', 'address', 'customer']) // تضمين معلومات المنتج والعنوان والعميل والمتجر
+        ->where('id', $orderId)
+        ->where('customer_id', $customerId)
+        ->first();
+
+    if (!$order) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Order not found or does not belong to this customer',
+        ], 404);
+    }
+
+    return response()->json([
+        'success' => true,
+        'order' => $order,
+    ]);
+}
+
+
+public function checkActiveOrder($deliveryId)
+    {
+        // تحقق مما إذا كان هناك طلب نشط للـ deliveryId المعطى
+        $activeOrder = DeliveryMenOrder::where('delivery_men_id', $deliveryId)
+                                        ->where('status', 'مقبول')
+                                        ->first();
+
+        // أعد حالة الطلب النشط كـ JSON
+        return response()->json([
+            'activeOrder' => $activeOrder ? true : false
+        ]);
+    }
     
+
+    public function cancelOrder(Request $request)
+{
+    // التحقق من صحة البيانات
+    $request->validate([
+        'order_id' => 'required',
+        'delivery_worker_id' => 'required',
+    ]);
+
+    $orderId = $request->input('order_id');
+    $deliveryWorkerId = $request->input('delivery_worker_id');
+
+    try {
+        // العثور على السجل في جدول delivery_men_orders
+        $deliveryMenOrder = DeliveryMenOrder::where('order_id', $orderId)
+                                             ->where('delivery_men_id', $deliveryWorkerId)
+                                             ->first();
+
+        if ($deliveryMenOrder) {
+            // تحديث حالة الطلب في جدول delivery_men_orders إلى "ملغى"
+            $deliveryMenOrder->status = 'ملغى';
+            $deliveryMenOrder->save();
+
+            // العثور على الطلب في جدول orders
+            $order = Order::find($orderId);
+
+            if ($order) {
+                // تحديث حالة الطلب إلى "جاهز للتوصيل" وتعيين delivery_worker_id إلى null
+                $order->order_status = 'الطلب جاهز للتوصيل';
+                $order->delivery_worker_id = null;
+                $order->save();
+
+                // جلب معلومات العميل، والعنوان، والمتجر
+                $customer = $order->customer;
+                $address = $order->address;
+                $store = $order->store;
+
+                // الحصول على العناصر وتفاصيل المنتج
+                $cartItems = $order->cart->items->map(function($item) {
+                    return [
+                        'id' => $item->id,
+                        'quantity' => $item->quantity,
+                        'product' => [
+                            'name' => $item->product->name,
+                            'price' => $item->product->price,
+                            'description' => $item->product->description, // افتراض وجود وصف للمنتج
+                        ],
+                        'items_price' => $item->items_price, // سعر العنصر في السلة
+                    ];
+                });
+
+                // تحديد العاملين في التوصيل ما عدا العامل الذي تم رفض الطلب منه
+                $excludedWorkerId = $deliveryWorkerId;
+                $workers = DeliveryMan::where('id', '!=', $excludedWorkerId)->get();
+
+                // إرسال الحدث إلى جميع العاملين في التوصيل ما عدا المستبعد
+                foreach ($workers as $worker) {
+                    event(new OrderReadyForDeliveryNew($order, $customer, $address, $cartItems, $excludedWorkerId));
+                }
+
+                return response()->json(['message' => 'تم إلغاء الطلب وتحديث حالة الطلب بنجاح.'], 200);
+            } else {
+                return response()->json(['message' => 'الطلب غير موجود.'], 404);
+            }
+        } else {
+            return response()->json(['message' => 'السجل المطلوب غير موجود في جدول delivery_men_orders.'], 404);
+        }
+    } catch (\Exception $e) {
+        return response()->json(['message' => 'حدث خطأ أثناء إلغاء الطلب.', 'error' => $e->getMessage()], 500);
+    }
+}
+
+    
+
     
 
     /**

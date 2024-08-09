@@ -12,6 +12,8 @@ class DeliveryMan extends Authenticatable
     
     use HasApiTokens, HasFactory, Notifiable;
 
+    const STATUS_ONLINE = 'متصل';
+    const STATUS_OFFLINE = 'غير متصل';
 
     protected $fillable = [
         'name',
@@ -45,9 +47,22 @@ class DeliveryMan extends Authenticatable
     ];
 
 
+    public static function getStatuses()
+    {
+        return [
+            self::STATUS_ONLINE,
+            self::STATUS_OFFLINE,
+        ];
+    }
+
+
     public function role(){
         return  $this->belongsTo(Role::class);
       }
 
+      public function orders()
+      {
+          return $this->hasMany(Order::class, 'delivery_worker_id');
+      }
     
 }

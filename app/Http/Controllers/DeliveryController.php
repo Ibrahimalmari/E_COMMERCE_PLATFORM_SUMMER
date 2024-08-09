@@ -8,11 +8,14 @@ use App\Models\Product;
 use App\Models\SellerMan;
 use App\Models\Store;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\File;
+
 
 class DeliveryController extends Controller
 {
@@ -29,55 +32,139 @@ class DeliveryController extends Controller
         ]);
     }
 
+    
     // إرجاع البيانات بنجاح
     return response()->json([
         'status' => 200,
         'deliveryMen' => $deliveryMen,
     ]);
 }
-    // الدالة لتسجيل الدخول
-    public function login(Request $request)
-    {
-        // تحقق من صحة البيانات المدخلة
-        $validatedData = Validator::make($request->all(), [
-            'email' => 'required|email',
-            'password' => 'required',
-        ]);
 
-        if ($validatedData->fails()) {
-            return response()->json([
-                'validation_error' => $validatedData->messages(),
-            ]);
-        }
 
-        // البحث عن موظف التوصيل باستخدام البريد الإلكتروني
-        $deliveryMan = DeliveryMan::where('email', $request->email)->first();
+public function deliveryWokerForEnsure()
+{
+    // جلب المستخدم الحالي بناءً على التوكين المرسل
+    $delivery = Auth::guard('api_delivery')->user();
 
-        // التحقق مما إذا كانت بيانات الدخول صحيحة
-        if (!$deliveryMan || !Hash::check($request->password, $deliveryMan->password)) {
-            return response()->json([
-                'status' => 401,
-                'message' => 'Invalid Credentials',
-            ]);
-        }
-
-        // إنشاء توكن لموظف التوصيل
-        $token = $deliveryMan->createToken($deliveryMan->email.'_Token')->plainTextToken;
-
+    if ($delivery) {
         return response()->json([
             'status' => 200,
-            'user' => $deliveryMan->name,
-            'role' => $deliveryMan->role_id,
-            'id' => $deliveryMan->id,
-            'token' => $token,
-            'message' => 'Logged in Successfully',
+            'delivery' => $delivery, // جلب بيانات المستخدم الحالي
+            'message' => 'Delivery data fetched successfully',
+        ]);
+    } else {
+        return response()->json([
+            'status' => 404,
+            'message' => 'Delivery not found',
         ]);
     }
+}
+
+
+
+public function getConnectedWorkers()
+{
+    $connectedWorkerIds = DeliveryMan::where('status', 'متصل')
+                                ->pluck('id');
+    
+    return response()->json(['workerid' => $connectedWorkerIds]);
+}
+
+
+
+public function updateStatus(Request $request, $id)
+{
+    // Validate the request
+    $validated = $request->validate([
+        'status' => 'required|string|in:متصل,غير متصل',
+    ]);
+
+    try {
+        // Find the delivery man by ID
+        $deliveryMan = DeliveryMan::findOrFail($id);
+
+        // Update the status directly
+        $deliveryMan->status = $validated['status'];
+        $deliveryMan->save();
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Delivery man status updated successfully',
+            'data' => $deliveryMan,
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'An error occurred: ' . $e->getMessage(),
+        ], 500);
+    }
+}
+
+    // الدالة لتسجيل الدخول
+    public function login(Request $request)
+{
+    // تحقق من صحة البيانات المدخلة
+    $validatedData = Validator::make($request->all(), [
+        'phone' => 'required|regex:/^\d{10}$/',
+    ]);
+
+    if ($validatedData->fails()) {
+        return response()->json([
+            'validation_error' => $validatedData->messages(),
+        ]);
+    }
+
+    // البحث عن موظف التوصيل باستخدام رقم الهاتف
+    $deliveryMan = DeliveryMan::where('phone', $request->phone)->first();
+
+    // التحقق مما إذا كان موظف التوصيل موجودًا
+    if (!$deliveryMan) {
+        return response()->json([
+            'status' => 401,
+            'message' => 'Invalid Phone Number',
+        ]);
+    }
+
+    // إنشاء توكن لموظف التوصيل
+    $token = $deliveryMan->createToken($deliveryMan->phone.'_Token')->plainTextToken;
+
+    return response()->json([
+        'status' => 200,
+        'user' => $deliveryMan->name,
+        'role' => $deliveryMan->role_id,
+        'delivery_id' => $deliveryMan->id,
+        'token' => $token,
+        'message' => 'Logged in Successfully',
+    ]);
+}
+
+
+public function deliverylogout(Request $request)
+{
+    // الحصول على العميل الحالي
+    $deliveryworker = $request->user(); // تأكد من أنك تستخدم Sanctum لحماية هذا المسار
+
+    if ($deliveryworker) {
+        // حذف جميع التوكين الخاصة بالعميل
+        $deleted = DB::table('personal_access_tokens')->where('tokenable_id', $deliveryworker->id)->where('tokenable_type', 'App\\Models\\DeliveryMan')->delete();
+
+        if ($deleted) {
+            return response()->json(['status' => 200, 'message' => 'تم تسجيل الخروج بنجاح.' ,'deliveryworker' => $deliveryworker]);
+        } else {
+            return response()->json(['status' => 500, 'message' => 'فشل في حذف التوكين.']);
+        }
+    } else {
+        return response()->json(['status' => 400, 'message' => 'لم يتم العثور على العميل.']);
+    }
+}
+
+
 
   
     public function register(Request $request)
     {
-        
+        try {
+
             // التحقق من صحة البيانات المدخلة
             $validatedData = Validator::make($request->all(), [
                 'name' => 'required|regex:/^[\p{Arabic}]+\s[\p{Arabic}]+$/u',
@@ -184,9 +271,20 @@ class DeliveryController extends Controller
                 'token' => $token,
                 'message' => 'تم عملية التسجيل بنجاح',
             ]);
-        } 
+        
+    } catch (ValidationException $e) {
+        return response()->json([
+            'status' => 401 ,
+            'message' => $e->getMessage(),
+        ]);
+    } catch (\Exception $ex) {
+        return response()->json([
+            'status' => 500 ,
+            'message' => $ex->getMessage(),
+        ]);
+    } 
     
-    
+}
 
     public function update(Request $request, $id)
     {

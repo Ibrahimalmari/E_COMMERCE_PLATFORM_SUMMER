@@ -1,6 +1,8 @@
 <?php
 
 namespace App\Http\Controllers;
+
+use App\Models\Store;
 use Illuminate\Support\Facades\Validator;
 use App\Models\Store_Section;
 use Illuminate\Http\Request;
@@ -21,6 +23,35 @@ class Store_Section_Controller extends Controller
            'message'=>' Successe',
        ]);
     }
+
+    public function getSectionsForStore($type)
+    {
+        // جلب المتاجر بناءً على النوع المرسل
+        $stores = Store::where('type', $type)->get();
+        
+        // التحقق من وجود المتاجر
+        if ($stores->isEmpty()) {
+            return response()->json([
+                'status' => 404,
+                'sections' => [],
+                'message' => 'No stores found for the specified type.',
+            ]);
+        }
+    
+        // الحصول على الأقسام الخاصة بكل متجر
+        $sections = [];
+        foreach ($stores as $store) {
+            $storeSections = Store_Section::where('store_id', $store->id)->get();
+            $sections = array_merge($sections, $storeSections->toArray());
+        }
+    
+        return response()->json([
+            'status' => 200,
+            'sections' => $sections,
+            'message' => 'Success',
+        ]);
+    }
+    
     
 
     /**

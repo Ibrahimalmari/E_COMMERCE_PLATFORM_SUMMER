@@ -22,7 +22,7 @@ class CustomerController extends Controller
      */
    public function getCustomer()
     {
-        $customer = Auth::guard('api')->user();
+        $customer = Auth::guard('api_customer')->user();
         if ($customer) {
             return response()->json([
                 'status' => 200,

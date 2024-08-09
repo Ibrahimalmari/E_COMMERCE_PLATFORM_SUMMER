@@ -22,7 +22,10 @@ return new class extends Migration
             $table->string('phone');
             $table->string('address')->nullable();
             $table->date('joining_date');
-            $table->string('status')->nullable();
+            $table->enum('status', [
+                'متصل',
+                'غير متصل'
+            ])->default('غير متصل');          
             $table->string('PhotoOfPersonalID')->nullable(); 
             $table->string('vehicle_image')->nullable();
             $table->string('license_image')->nullable(); 

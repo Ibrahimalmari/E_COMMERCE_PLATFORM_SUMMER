@@ -36,9 +36,10 @@ public function branch()
 }
 
 
- public function cartitem(){
-    return $this->hasMany(CartItem::class);
- }
+public function cartItems()
+{
+    return $this->hasMany(CartItem::class, 'product_id');
+}
 
  public function create_product_seller()
  {

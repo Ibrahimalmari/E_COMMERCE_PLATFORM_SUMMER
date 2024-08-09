@@ -102,6 +102,7 @@ Route::controller(Store_Section_Controller::class)->group(function () {
     Route::get('/SectionToStore/{id}','edit'); 
     Route::put('/UpdateSectionToStore/{id}','update');
     Route::delete('/DeleteSectionToStore/{id}','destroy');
+    Route::get('/sections/{type}',  'getSectionsForStore');
 
 });      
 
@@ -160,9 +161,12 @@ Route::controller(DeliveryController::class)->group(function () {
     Route::get('/delivery/{id}','edit');
     Route::put('/updatedelivery/{id}','update');
     Route::delete('/deletedelivery/{id}','destroy');
-Route::middleware(['auth:sanctum'])->group(function () {
-    Route::post('/deliverylogout/{id}', 'Logout');
-    });
+    Route::middleware('auth:api_delivery')->get('/deliveryWokerForEnsure','deliveryWokerForEnsure');
+    Route::middleware('auth:sanctum')->post('/LogoutDelivery','deliverylogout');
+    Route::post('/delivery-men/status/{id}', 'updateStatus');
+    Route::get('/get-connected-workers',  'getConnectedWorkers');
+    Route::get('/check-active-order/{deliveryId}',  'checkActiveOrder');
+
 });
 
 
@@ -179,7 +183,7 @@ Route::controller(CustomerController::class)->group(function () {
     Route::post('/LoginUser','login');
     Route::post('/completeRegistration','completeRegistration');
     Route::post('/verifyemail','verifyEmail');
-    Route::middleware('auth:api')->get('/customer',  'getCustomer');
+    Route::middleware('auth:api_customer')->get('/customer','getCustomer');
     Route::middleware('auth:sanctum')->post('/logout',  'logout');
 });
 
@@ -192,6 +196,8 @@ Route::controller(CartController::class)->group(function () {
     Route::get('/customer/cart/{customerId}/{storeId}',  'DisplayProductInCartForCustomer');
     Route::post('/cart/update-quantity/{id}',  'updateQuantity');
     Route::delete('/cart/remove-item/{id}',  'removeItem');
+    Route::get('/savedCarts',  'getSavedCarts');  ///جلب كل  السلات لمستخدم من
+    Route::get('/cart/{cartId}',  'getCartDetails'); // جلب تفاصيل السلة معينة 
 
 });
 
@@ -211,6 +217,10 @@ Route::post('/orders/status/{id}',  'updateStatus'); // Route لتحديث حا�
 Route::post('/accept-order-creation',  'acceptOrderCreation');
 Route::post('/reject-order-creation',  'rejectOrderCreation');
 Route::get('/ForShowMyOrderToCustomer','ForShowMyOrderToCustomer');
+Route::get('/OrderDetails/{orderId}', 'getOrderDetails');
+Route::post('/accept-order-for-delivery', 'acceptOrderfordelivery');
+Route::post('/reject-order-for-delivery', 'rejectOrderForDelivery');
+Route::post('/cancel-order',  'cancelOrder'); //for delivery worker
 
 
 

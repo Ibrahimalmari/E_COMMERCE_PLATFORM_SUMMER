@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\DeliveryMan;
 use Illuminate\Support\Facades\Broadcast;
 
 /*
@@ -22,6 +23,11 @@ Broadcast::channel('my-event', function () {
 Broadcast::channel('my-event-customer', function () {
     return true;
 });
+
+
+
+
+
 
 
 

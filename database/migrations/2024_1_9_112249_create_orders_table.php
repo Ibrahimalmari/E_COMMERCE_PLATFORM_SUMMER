@@ -20,7 +20,7 @@ return new class extends Migration
             $table->text('delivery_notes')->nullable(); 
             $table->double('delivery_fee')->nullable();
             $table->double('discount')->nullable(); 
-            $table->double('invoice_amount')->nullable();; 
+            $table->double('invoice_amount')->nullable();
             $table->enum('order_status', [
                 'تم استلام الطلب',
                 'الطلب قيد التجهيز',
@@ -28,13 +28,17 @@ return new class extends Migration
                 'الطلب في مرحلة التوصيل',
                 'تم تسليم الطلب'
             ])->default('تم استلام الطلب');         
-            $table->string('pay_way')->nullable();;
-            $table->double('tax')->nullable();;
-            $table->double('tip')->nullable();; 
+            $table->string('pay_way')->nullable();
+            $table->double('tax')->nullable();
+            $table->double('tip')->nullable(); 
+            $table->integer('rating')->nullable()->comment('تقييم الطلب من 1 إلى 5');
+            $table->text('feedback')->nullable()->comment('ملاحظات العميل');
+            $table->timestamp('actual_delivery_time')->nullable()->comment('وقت التسليم الفعلي');
             $table->foreignId('cart_id')->constrained('carts')->onUpdate('cascade')->onDelete('cascade');
             $table->foreignId('customer_id')->constrained('customers')->onUpdate('cascade')->onDelete('cascade');
             $table->foreignId('store_id')->constrained('stores')->onUpdate('cascade')->onDelete('cascade');
             $table->foreignId('address_id')->constrained('addresses')->onUpdate('cascade')->onDelete('cascade'); 
+            $table->foreignId('delivery_worker_id')->nullable()->constrained('delivery_men')->onUpdate('cascade')->onDelete('set null');
             $table->timestamps();
         });
     }

@@ -21,10 +21,10 @@ return new class extends Migration
             $table->string('phone')->nullable();
             $table->string('address')->nullable();
             $table->string('coverPhoto')->nullable();
+            $table->enum('status', ['نشط', 'مغلق'])->default('نشط');
             $table->decimal('latitude', 10, 8)->nullable(); 
             $table->decimal('longitude', 11, 8)->nullable(); 
             $table->string('type')->nullable();
-            $table->string('status')->nullable();
             $table->string('openTime')->nullable();
             $table->string('closeTime')->nullable();
             $table->foreignId('seller_id')->constrained('seller_men')->onUpdate('cascade')->onDelete('cascade');

@@ -40,21 +40,21 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
-        'api' => [
+        'api_admin' => [
             'driver' => 'sanctum',
             'provider' => 'admins',
         ],
-        'api' => [
+        'api_seller' => [
             'driver' => 'sanctum',
             'provider' => 'seller_men',
         ],
 
-        'api' => [
+        'api_delivery' => [
             'driver' => 'sanctum',
             'provider' => 'delivery_men',
         ],
        
-        'api' => [
+        'api_customer' => [
             'driver' => 'sanctum',
             'provider' => 'customers',
         ],

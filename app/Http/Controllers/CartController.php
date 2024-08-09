@@ -12,45 +12,56 @@ use Illuminate\Support\Facades\Auth;
 class CartController extends Controller
 {
     public function addToCart(Request $request)
-    {
-        $customerId = Auth::guard('api')->id();
-    
-        // البحث عن المنتج
-        $product = Product::findOrFail($request->product_id);
-        $storeId = $product->store_id;
-    
-        // البحث عن السلة الحالية للمستخدم التي ليست مكتملة ولها نفس store_id
-        $cart = Cart::where('customer_id', $customerId)
-                    ->where('status', '!=', 'completed')
-                    ->where('store_id', $storeId)
-                    ->first();
-    
-        // إذا لم يتم العثور على سلة غير مكتملة بنفس store_id، إنشاء سلة جديدة
-        if (!$cart) {
-            $cart = Cart::create([
-                'customer_id' => $customerId,
-                'total_price' => 0,
-                'store_id' => $storeId, // تعيين store_id
-            ]);
-        }
-    
-        // حساب سعر العناصر
-        $items_price = $product->price * $request->quantity;
-    
-        // إضافة عنصر إلى عربة التسوق
+{
+    $customerId = Auth::guard('api_customer')->id();
+
+    // البحث عن المنتج
+    $product = Product::findOrFail($request->product_id);
+    $storeId = $product->store_id;
+
+    // البحث عن السلة الحالية للمستخدم التي ليست مكتملة ولها نفس store_id
+    $cart = Cart::where('customer_id', $customerId)
+                ->where('status', '!=', 'completed')
+                ->where('store_id', $storeId)
+                ->first();
+
+    // إذا لم يتم العثور على سلة غير مكتملة بنفس store_id، إنشاء سلة جديدة
+    if (!$cart) {
+        $cart = Cart::create([
+            'customer_id' => $customerId,
+            'total_price' => 0,
+            'store_id' => $storeId, // تعيين store_id
+        ]);
+    }
+
+    // البحث عن العنصر في السلة
+    $cartItem = CartItem::where('cart_id', $cart->id)
+                        ->where('product_id', $product->id)
+                        ->first();
+
+    if ($cartItem) {
+        // إذا كان العنصر موجودًا بالفعل، قم بزيادة الكمية
+        $cartItem->quantity += $request->quantity;
+        $cartItem->items_price += $product->price * $request->quantity;
+        $cartItem->save();
+    } else {
+        // إذا لم يكن العنصر موجودًا، قم بإنشاء عنصر جديد
         $cartItem = CartItem::create([
             'cart_id' => $cart->id,
             'product_id' => $product->id,
             'quantity' => $request->quantity,
-            'items_price' => $items_price,
+            'items_price' => $product->price * $request->quantity,
             'notes' => $request->notes,
         ]);
-    
-        $cart->total_price += $items_price;
-        $cart->save();
-    
-        return response()->json(['message' => 'Product added to cart successfully!', 'cart' => $cart, 'cartItem' => $cartItem], 201);
     }
+
+    // تحديث السعر الإجمالي للسلة
+    $cart->total_price += $product->price * $request->quantity;
+    $cart->save();
+
+    return response()->json(['message' => 'Product added to cart successfully!', 'cart' => $cart, 'cartItem' => $cartItem], 201);
+}
+
     
 
 
@@ -180,33 +191,34 @@ public function displayProductInCartForCustomer($customerId, $storeId)
 
 
   // في تحديث الكمية بالنموذج Cart
-public function updateQuantity($id, Request $request)
-{
-    $request->validate([
-        'quantity' => 'required|integer|min:1',
-    ]);
-
-    // العثور على عنصر السلة المطلوب
-    $cartItem = CartItem::findOrFail($id);
-    $oldQuantity = $cartItem->quantity;
-    $cartItem->quantity = $request->input('quantity');
-    $cartItem->save();
-
-    // إعادة حساب السعر الإجمالي للعنصر بناءً على الكمية الجديدة
-    $itemsPriceDifference = ($cartItem->quantity - $oldQuantity) * $cartItem->product->price;
-    $cartItem->items_price += $itemsPriceDifference;
-    $cartItem->save();
-
-    // إعادة حساب السعر الإجمالي للسلة
-    $cart = Cart::findOrFail($cartItem->cart_id);
-    $totalPrice = $cart->cartItem()->sum('items_price'); // استخدام العلاقة هنا
-
-    // تحديث السعر الإجمالي في جدول carts
-    $cart->total_price = $totalPrice;
-    $cart->save();
-
-    return response()->json(['message' => 'تم تحديث الكمية والسعر الإجمالي بنجاح']);
-}
+  public function updateQuantity($id, Request $request)
+  {
+      $request->validate([
+          'quantity' => 'required|integer|min:1',
+      ]);
+  
+      // العثور على عنصر السلة المطلوب
+      $cartItem = CartItem::findOrFail($id);
+      $oldQuantity = $cartItem->quantity;
+      $cartItem->quantity = $request->input('quantity');
+      $cartItem->save();
+  
+      // إعادة حساب السعر الإجمالي للعنصر بناءً على الكمية الجديدة
+      $itemsPriceDifference = ($cartItem->quantity - $oldQuantity) * $cartItem->product->price;
+      $cartItem->items_price += $itemsPriceDifference;
+      $cartItem->save();
+  
+      // إعادة حساب السعر الإجمالي للسلة
+      $cart = Cart::findOrFail($cartItem->cart_id);
+      $totalPrice = $cart->items()->sum('items_price'); // استخدام العلاقة الصحيحة هنا
+  
+      // تحديث السعر الإجمالي في جدول carts
+      $cart->total_price = $totalPrice;
+      $cart->save();
+  
+      return response()->json(['message' => 'تم تحديث الكمية والسعر الإجمالي بنجاح']);
+  }
+  
 
     
     
@@ -230,6 +242,61 @@ public function removeItem($id)
     return response()->json(['message' => 'تم حذف المنتج من السلة بنجاح']);
 }
 
+
+ // في App\Http\Controllers\CartController.php
+
+ public function getSavedCarts()
+ {
+     $customerId = Auth::guard('api')->id();
+ 
+     // استعلام لجلب السلات غير المكتملة مع تفاصيل المتجر والعناصر والمنتجات
+     $carts = Cart::with([
+         'store', 
+         'items.product' // يتطلب علاقة في CartItem لجلب المنتج
+     ])
+     ->where('customer_id', $customerId)
+     ->where('status', 'uncompleted') // تأكد من استخدام العمود الصحيح هنا
+     ->get()
+     ->map(function ($cart) {
+         return [
+             'id' => $cart->id,
+             'storeName' => $cart->store ? $cart->store->name : 'غير متوفر',
+             'storeImage' => $cart->store ? $cart->store->coverPhoto : null,
+             'store_id' =>  $cart->store_id,
+             'items' => $cart->items->map(function ($item) {
+                 return [
+                     'productName' => $item->product->name,
+                     'productImage' => $item->product->images, // تأكد من اسم العمود الصحيح
+                     'quantity' => $item->quantity
+                 ];
+             }),
+             'totalPrice' => $cart->items->sum(function ($item) {
+                 return $item->product->price * $item->quantity;
+             })
+         ];
+     });
+ 
+     return response()->json([
+         'success' => true,
+         'carts' => $carts
+     ]);
+ }
+ 
+ 
+
+
+ // دالة لجلب تفاصيل سلة معينة
+ public function getCartDetails($cartId)
+ {
+    $customerId = Auth::guard('api')->id();
+
+     $cart = Cart::where('id', $cartId)->where('customer_id', $customerId)->with('items.product')->firstOrFail();
+
+     return response()->json([
+         'success' => true,
+         'cart' => $cart
+     ]);
+ }
     
     
 }

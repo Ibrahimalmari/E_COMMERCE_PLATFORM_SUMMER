@@ -16,6 +16,7 @@ class Order extends Model
     const STATUS_READY = 'الطلب جاهز للتوصيل';
     const STATUS_IN_DELIVERY = 'الطلب في مرحلة التوصيل';
     const STATUS_DELIVERED = 'تم تسليم الطلب';
+    
 
 
 
@@ -35,9 +36,16 @@ class Order extends Model
         'customer_id',
         'store_id',
         'address_id', 
-
+        'delivery_worker_id',
+        'scheduled_delivery_time',
+        'feedback',
+        'rating',
     ];
 
+
+    public static $rules = [
+        'rating' => 'nullable|integer|between:1,5', // التحقق من أن التقييم بين 1 و 5
+    ];
 
     public static function getStatuses()
     {
@@ -72,6 +80,16 @@ class Order extends Model
         return $this->belongsTo(Address::class);
     }
 
+    public function deliveryWorker()
+    {
+        return $this->belongsTo(DeliveryMan::class, 'delivery_worker_id');
+    }
+
+    public function deliveryMenOrders()
+    {
+        return $this->hasMany(DeliveryMenOrder::class, 'order_id');
+    }
+    
     protected static function boot()
     {
         parent::boot();
