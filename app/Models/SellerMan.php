@@ -23,6 +23,8 @@ class SellerMan extends Authenticatable
         'DateOfBirth',
         'NationalNumber',
         'role_id',
+        'last_payment_date',
+        'account_status', 
     ];
 
 

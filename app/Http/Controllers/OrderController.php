@@ -346,6 +346,8 @@ public function rejectOrderCreation()
             $deliveryMenOrder->status = 'مقبول'; // حالة الطلب يمكن تعديلها حسب الحاجة
             $deliveryMenOrder->save();
 
+
+
             return response()->json(['message' => 'تم تحديث الطلب وإضافة السجل بنجاح.'], 200);
         } else {
             return response()->json(['message' => 'طلب غير موجود.'], 404);
@@ -384,6 +386,12 @@ public function rejectOrderForDelivery(Request $request)
             $order->order_status = 'الطلب جاهز للتوصيل';
             $order->delivery_worker_id = null; // تعيينها إلى null
             $order->save();
+
+            $deliveryMenOrder = new DeliveryMenOrder();
+            $deliveryMenOrder->delivery_men_id = $deliveryWorkerId;
+            $deliveryMenOrder->order_id = $orderId;
+            $deliveryMenOrder->status = 'مرفوض'; // حالة الطلب يمكن تعديلها حسب الحاجة
+            $deliveryMenOrder->save();
             
             return response()->json(['message' => 'تم تحديث حالة الطلب بنجاح.'], 200);
         } else {
@@ -482,18 +490,7 @@ public function rejectOrderForDelivery(Request $request)
 }
 
 
-public function checkActiveOrder($deliveryId)
-    {
-        // تحقق مما إذا كان هناك طلب نشط للـ deliveryId المعطى
-        $activeOrder = DeliveryMenOrder::where('delivery_men_id', $deliveryId)
-                                        ->where('status', 'مقبول')
-                                        ->first();
 
-        // أعد حالة الطلب النشط كـ JSON
-        return response()->json([
-            'activeOrder' => $activeOrder ? true : false
-        ]);
-    }
     
 
     public function cancelOrder(Request $request)
@@ -567,38 +564,7 @@ public function checkActiveOrder($deliveryId)
     }
 }
 
-    
 
-    
-
-    /**
-     * Show the form for editing the specified resource.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function edit($id)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
  
 
-    /**
-     * Remove the specified resource from storage.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function destroy($id)
-    {
-        //
-    }
 }

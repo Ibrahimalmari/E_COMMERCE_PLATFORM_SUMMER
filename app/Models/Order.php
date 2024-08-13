@@ -89,6 +89,12 @@ class Order extends Model
     {
         return $this->hasMany(DeliveryMenOrder::class, 'order_id');
     }
+
+
+    public function transactions()
+    {
+        return $this->hasMany(Transaction::class);
+    }
     
     protected static function boot()
     {

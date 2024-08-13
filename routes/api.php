@@ -10,6 +10,7 @@ use App\Http\Controllers\CartController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DeliveryController;
+use App\Http\Controllers\DeliveryMenOrdersController;
 use App\Http\Controllers\DiscountController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrderController;
@@ -19,7 +20,8 @@ use App\Http\Controllers\SectionController;
 use App\Http\Controllers\SellerController;
 use App\Http\Controllers\Store_Section_Controller;
 use App\Http\Controllers\StoreController;
-
+use App\Http\Controllers\TransactionController;
+use App\Models\DeliveryMenOrder;
 
 /*
 |--------------------------------------------------------------------------
@@ -221,7 +223,24 @@ Route::get('/OrderDetails/{orderId}', 'getOrderDetails');
 Route::post('/accept-order-for-delivery', 'acceptOrderfordelivery');
 Route::post('/reject-order-for-delivery', 'rejectOrderForDelivery');
 Route::post('/cancel-order',  'cancelOrder'); //for delivery worker
+Route::get('/orders/pending/delivery', 'getPendingOrders');
 
+});
 
+Route::controller(DeliveryMenOrdersController::class)->group(function () {      
+    Route::get('/delivery-men/orders/{deliveryMenId}','getOrdersByDeliveryMan');
+    Route::get('delivery-men/rates/{id}','showRates');
+
+});
+
+Route::controller(TransactionController::class)->group(function () {      
+
+// معاملات عامل التوصيل
+Route::post('transactions/delivery','storeDeliveryTransaction');
+Route::get('transactions/delivery/{deliveryWorkerId}','getDeliveryTransactions');
+
+// معاملات صاحب المتجر
+Route::post('transactions/store', 'storeStoreTransaction');
+Route::get('transactions/store/{storeId}', 'getStoreTransactions');
 
 });

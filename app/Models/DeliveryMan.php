@@ -30,6 +30,8 @@ class DeliveryMan extends Authenticatable
         'vehicle_number',
         'NationalNumber',
         'role_id',
+        'last_payment_date', 
+        'account_status',     
     ];
 
     protected $hidden = [
@@ -64,5 +66,13 @@ class DeliveryMan extends Authenticatable
       {
           return $this->hasMany(Order::class, 'delivery_worker_id');
       }
-    
+
+      public function transactions()
+      {
+          return $this->hasMany(Transaction::class, 'delivery_worker_id');
+      }
+ 
+      
+
+     
 }

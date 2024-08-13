@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\File;
-
+use Carbon\Carbon;
 
 class DeliveryController extends Controller
 {
@@ -100,8 +100,7 @@ public function updateStatus(Request $request, $id)
     }
 }
 
-    // الدالة لتسجيل الدخول
-    public function login(Request $request)
+public function login(Request $request)
 {
     // تحقق من صحة البيانات المدخلة
     $validatedData = Validator::make($request->all(), [
@@ -121,8 +120,33 @@ public function updateStatus(Request $request, $id)
     if (!$deliveryMan) {
         return response()->json([
             'status' => 401,
-            'message' => 'Invalid Phone Number',
+            'message' => 'رقم الهاتف غير صحيح',
         ]);
+    }
+
+    // التحقق من تاريخ آخر دفع
+    $lastPaymentDate = $deliveryMan->last_payment_date;
+    if ($lastPaymentDate) {
+        $lastPaymentDate = \Carbon\Carbon::parse($lastPaymentDate);
+        $currentDate = \Carbon\Carbon::now();
+        $oneWeekAgo = $currentDate->subWeek();
+
+        if ($lastPaymentDate->lt($oneWeekAgo)) {
+            // تغيير حالة الحساب إلى "معلق"
+            $deliveryMan->account_status = 'معلق';
+            $deliveryMan->save();
+
+            return response()->json([
+                'status' => 402,
+                'message' => 'المستحقات المالية متأخرة. يرجى تسوية مستحقاتك مع الشركة.',
+            ]);
+        } else {
+            // إذا كان تاريخ آخر دفع مضى عليه أقل من أسبوع، يمكن تغيير الحالة إلى "نشط" إذا لم تكن كذلك بالفعل
+            if ($deliveryMan->account_status === 'معلق') {
+                $deliveryMan->account_status = 'نشط';
+                $deliveryMan->save();
+            }
+        }
     }
 
     // إنشاء توكن لموظف التوصيل
@@ -134,9 +158,11 @@ public function updateStatus(Request $request, $id)
         'role' => $deliveryMan->role_id,
         'delivery_id' => $deliveryMan->id,
         'token' => $token,
-        'message' => 'Logged in Successfully',
+        'message' => 'تم تسجيل الدخول بنجاح',
     ]);
 }
+
+
 
 
 public function deliverylogout(Request $request)
@@ -522,5 +548,6 @@ public function deliverylogout(Request $request)
     }
     
     
+   
     
 }

@@ -32,6 +32,9 @@ return new class extends Migration
             $table->string('vehicle_type')->nullable();
             $table->string('vehicle_number')->nullable();    
             $table->string('NationalNumber')->nullable(); 
+             // إضافة حقل لتخزين تاريخ آخر دفع
+             $table->timestamp('last_payment_date')->nullable();
+             $table->enum('account_status', ['نشط', 'معلق'])->default('نشط');
             $table->foreignId('role_id')->constrained("roles")->onUpdate('cascade')->onDelete('cascade');
             $table->rememberToken();
             $table->timestamps();
