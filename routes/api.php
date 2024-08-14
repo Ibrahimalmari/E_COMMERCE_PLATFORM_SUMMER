@@ -12,6 +12,7 @@ use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\DeliveryMenOrdersController;
 use App\Http\Controllers\DiscountController;
+use App\Http\Controllers\FavoriteController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ProductController;
@@ -65,6 +66,7 @@ Route::controller(StoreController::class)->group(function () {
     Route::get('/displaystore/{id}','index_seller');
     Route::get('/DisplayStoreToCustomer/{id}','DisplayStoreToCustomer');
     Route::get('/store/getStoreDetails/{store_id}','getStoreDetails');
+    Route::get('/store/getStoreAddress/{store_id}','getStoreAddress');
     Route::post('/StoreAdd/{id}','store');
     Route::get('/store/{id}','edit');
     Route::put('/updatestore/{id}','update');
@@ -178,6 +180,8 @@ Route::controller(DiscountController::class)->group(function () {
     Route::get('/discount/{id}','edit');
     Route::put('/updatediscount/{id}','update');
     Route::delete('/deletediscount/{id}','destroy');
+    Route::post('/apply-discount', 'applyDiscount');
+
 });
 
 Route::controller(CustomerController::class)->group(function () {      
@@ -193,6 +197,7 @@ Route::controller(CustomerController::class)->group(function () {
 Route::controller(CartController::class)->group(function () {      
 
     Route::post('/cart/add','addToCart');
+    Route::post('/CartAddDuringReOrder','addToCartduringReOrder');
     Route::get('/checkCart/{customerId}/{storeId}','checkCart');
     Route::delete('/removeCart/{customerId}/{storeId}', 'removeCart');
     Route::get('/customer/cart/{customerId}/{storeId}',  'DisplayProductInCartForCustomer');
@@ -213,34 +218,43 @@ Route::controller(AddressController::class)->group(function () {
 
 Route::controller(OrderController::class)->group(function () {      
 
-Route::post('/orders','store');
-Route::get('/orders/{id}','show');
-Route::post('/orders/status/{id}',  'updateStatus'); // Route لتحديث حالة الطلب
-Route::post('/accept-order-creation',  'acceptOrderCreation');
-Route::post('/reject-order-creation',  'rejectOrderCreation');
-Route::get('/ForShowMyOrderToCustomer','ForShowMyOrderToCustomer');
-Route::get('/OrderDetails/{orderId}', 'getOrderDetails');
-Route::post('/accept-order-for-delivery', 'acceptOrderfordelivery');
-Route::post('/reject-order-for-delivery', 'rejectOrderForDelivery');
-Route::post('/cancel-order',  'cancelOrder'); //for delivery worker
-Route::get('/orders/pending/delivery', 'getPendingOrders');
+    Route::post('/orders','store');
+    Route::get('/orders/{id}','show');
+    Route::post('/orders/status/{id}',  'updateStatus'); // Route لتحديث حالة الطلب
+    Route::post('/accept-order-creation',  'acceptOrderCreation');
+    Route::post('/reject-order-creation',  'rejectOrderCreation');
+    Route::get('/ForShowMyOrderToCustomer','ForShowMyOrderToCustomer');
+    Route::get('/OrderDetails/{orderId}', 'getOrderDetails');
+    Route::post('/accept-order-for-delivery', 'acceptOrderfordelivery');
+    Route::post('/reject-order-for-delivery', 'rejectOrderForDelivery');
+    Route::post('/cancel-order',  'cancelOrder'); //for delivery worker
+    Route::get('/orders/pending/delivery', 'getPendingOrders');
+    Route::get('orders/getOrderStatus/{id}',  'getOrderStatus');
+    Route::post('orders/rate{id}','rateOrder');
 
-});
+    });
 
 Route::controller(DeliveryMenOrdersController::class)->group(function () {      
     Route::get('/delivery-men/orders/{deliveryMenId}','getOrdersByDeliveryMan');
     Route::get('delivery-men/rates/{id}','showRates');
 
-});
+    });
 
 Route::controller(TransactionController::class)->group(function () {      
 
-// معاملات عامل التوصيل
-Route::post('transactions/delivery','storeDeliveryTransaction');
-Route::get('transactions/delivery/{deliveryWorkerId}','getDeliveryTransactions');
+    // معاملات عامل التوصيل
+    Route::post('transactions/delivery','storeDeliveryTransaction');
+    Route::get('transactions/delivery/{deliveryWorkerId}','getDeliveryTransactions');
 
-// معاملات صاحب المتجر
-Route::post('transactions/store', 'storeStoreTransaction');
-Route::get('transactions/store/{storeId}', 'getStoreTransactions');
+    // معاملات صاحب المتجر
+    Route::post('transactions/store', 'storeStoreTransaction');
+    Route::get('transactions/store/{storeId}', 'getStoreTransactions');
 
-});
+    });
+Route::controller(FavoriteController::class)->group(function () {      
+    Route::post('favorite/getFavorites','getFavorites');
+    Route::post('favorite/add', 'addFavorite');
+    Route::post('favorite/remove','removeFavorite');
+    Route::get('favorite/check/{customerId}/{storeId}','check');
+
+    });

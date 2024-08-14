@@ -172,7 +172,12 @@ class OrderController extends Controller
         }
 
         $eventData = [
-            'order' => $validated,
+            'order_id' => $order->id, // Include the order_id
+            'invoice_amount' => $validated['invoice_amount'],
+            'delivery_fee' => $validated['delivery_fee'],
+            'store_id' => $validated['store_id'],
+            'tax' => $validated['tax'],
+            'discount' => $validated['discount'],
             'message' => 'طلب قيد التجهيز سوف يتم تجهزو خلال الوقت المتوقع',
         ];
          // Dispatch the event
@@ -442,7 +447,7 @@ public function rejectOrderForDelivery(Request $request)
 
     public function ForShowMyOrderToCustomer()
     {
-        $customerId = Auth::guard('api')->id(); // احصل على معرف المستخدم المسجل
+        $customerId = Auth::guard('api_customer')->id(); // احصل على معرف المستخدم المسجل
     
         // احصل على جميع الطلبات الخاصة بالمستخدم المسجل مع معلومات المنتج والعنوان
         $orders = Order::with(['cart.items.product.store', 'address', 'customer']) // تضمين معلومات المنتج والعنوان والعميل والمتجر
@@ -468,7 +473,7 @@ public function rejectOrderForDelivery(Request $request)
     
     public function getOrderDetails($orderId)
 {
-    $customerId = Auth::guard('api')->id(); // احصل على معرف المستخدم المسجل
+    $customerId = Auth::guard('api_customer')->id(); // احصل على معرف المستخدم المسجل
 
     // احصل على تفاصيل الطلب بناءً على معرف الطلب ومعرف العميل
     $order = Order::with(['cart.items.product.store', 'address', 'customer']) // تضمين معلومات المنتج والعنوان والعميل والمتجر
@@ -565,6 +570,38 @@ public function rejectOrderForDelivery(Request $request)
 }
 
 
+
+        public function getOrderStatus($id)
+        {
+            $order = Order::find($id);
+
+            if (!$order) {
+                return response()->json(['error' => 'Order not found'], 404);
+            }
+
+            return response()->json(['status' => $order->order_status]);
+        }
+
+
+        public function rateOrder(Request $request, $id)
+        {
+            $request->validate([
+                'rating' => 'required|integer|between:1,5',
+                'feedback' => 'nullable|string',
+            ]);
+
+            $order = Order::find($id);
+
+            if (!$order) {
+                return response()->json(['error' => 'Order not found'], 404);
+            }
+
+            $order->rating = $request->input('rating');
+            $order->feedback = $request->input('feedback');
+            $order->save();
+
+            return response()->json(['success' => 'Rating submitted successfully']);
+        }
  
 
 }

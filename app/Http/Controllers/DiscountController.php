@@ -29,6 +29,30 @@ class DiscountController extends Controller
                 'discounts' => $discounts,
             ]);       
 }
+
+
+public function applyDiscount(Request $request)
+{
+    $request->validate([
+        'code' => 'required|string',
+    ]);
+
+    $discount = Discount::where('code', $request->code)
+                        ->whereDate('start_date', '<=', now())
+                        ->whereDate('end_date', '>=', now())
+                        ->first();
+
+    if (!$discount) {
+        return response()->json(['success' => false, 'message' => 'كود الخصم غير صحيح أو منتهي الصلاحية.'], 404);
+    }
+
+    return response()->json([
+        'success' => true,
+        'message' => 'تم تطبيق كود الخصم بنجاح!',
+        'discount' => $discount,
+    ], 200);
+}
+
     
     
 public function store(Request $request)

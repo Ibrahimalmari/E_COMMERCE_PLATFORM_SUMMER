@@ -81,6 +81,21 @@ class StoreController extends Controller
         }
     }
     
+
+    public function getStoreAddress($store_id)
+    {
+        try {
+            // جلب بيانات المتجر
+            $store = Store::findOrFail($store_id);
+    
+            return response()->json([
+                'store' => $store,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error fetching store details: ' . $e->getMessage());
+            return response()->json(['error' => 'Failed to fetch store details.'], 500);
+        }
+    }
     
     
     

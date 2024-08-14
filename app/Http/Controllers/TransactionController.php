@@ -29,6 +29,7 @@ class TransactionController extends Controller
          $transaction->store_id = $request->store_id;
          $transaction->order_id = $request->order_id;
          $transaction->total_amount = $request->total_amount;
+         $transaction->delivery_fee = $request->delivery_fee;
          $transaction->amount_paid = $request->amount_paid;
          $transaction->transaction_type = 'store';
          $transaction->save();

@@ -62,7 +62,58 @@ class CartController extends Controller
     return response()->json(['message' => 'Product added to cart successfully!', 'cart' => $cart, 'cartItem' => $cartItem], 201);
 }
 
+public function addToCartduringReOrder(Request $request)
+{
+    $customerId = Auth::guard('api_customer')->id();
     
+    $items = $request->input('items', []);
+    
+    foreach ($items as $item) {
+        $product = Product::findOrFail($item['product_id']);
+        $storeId = $product->store_id;
+        
+        $cart = Cart::where('customer_id', $customerId)
+                    ->where('status', '!=', 'completed')
+                    ->where('store_id', $storeId)
+                    ->first();
+        
+        if (!$cart) {
+            $cart = Cart::create([
+                'customer_id' => $customerId,
+                'total_price' => 0,
+                'store_id' => $storeId,
+            ]);
+        }
+        
+        $cartItem = CartItem::where('cart_id', $cart->id)
+                            ->where('product_id', $product->id)
+                            ->first();
+        
+        if ($cartItem) {
+            $cartItem->quantity += $item['quantity'];
+            $cartItem->items_price += $product->price * $item['quantity'];
+            $cartItem->save();
+        } else {
+            $cartItem = CartItem::create([
+                'cart_id' => $cart->id,
+                'product_id' => $product->id,
+                'quantity' => $item['quantity'],
+                'items_price' => $product->price * $item['quantity'],
+                'notes' => $item['notes'] ?? '',
+            ]);
+        }
+        
+        $cart->total_price += $product->price * $item['quantity'];
+        $cart->save();
+    }
+    
+    return response()->json([
+        'message' => 'Products added to cart successfully!',
+        'cart' => $cart
+    ], 201);
+}
+
+
 
 
     public function checkCart($customerId, $storeId)
@@ -247,7 +298,7 @@ public function removeItem($id)
 
  public function getSavedCarts()
  {
-     $customerId = Auth::guard('api')->id();
+     $customerId = Auth::guard('api_customer')->id();
  
      // استعلام لجلب السلات غير المكتملة مع تفاصيل المتجر والعناصر والمنتجات
      $carts = Cart::with([
@@ -288,7 +339,7 @@ public function removeItem($id)
  // دالة لجلب تفاصيل سلة معينة
  public function getCartDetails($cartId)
  {
-    $customerId = Auth::guard('api')->id();
+    $customerId = Auth::guard('api_customer')->id();
 
      $cart = Cart::where('id', $cartId)->where('customer_id', $customerId)->with('items.product')->firstOrFail();
 
